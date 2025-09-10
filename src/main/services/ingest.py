@@ -14,7 +14,7 @@ from src.main.models.staging import RawProductEventCreate, JobExecutionCreate, J
 class IngestionService:
     """Service for ingesting raw product data events."""
     
-    async def create_job(self, job_name: str, metadata: Optional[Dict[str, Any]] = None) -> str:
+    async def create_job(self, job_name: str, job_metadata: Optional[Dict[str, Any]] = None) -> str:
         """Create a new job execution record and return job_id."""
         job_id = str(uuid.uuid4())
         
@@ -23,7 +23,7 @@ class IngestionService:
                 job_id=job_id,
                 job_name=job_name,
                 status=JobStatus.PENDING,
-                metadata=metadata or {}
+                job_metadata=job_metadata or {}
             )
             session.add(job)
             await session.commit()

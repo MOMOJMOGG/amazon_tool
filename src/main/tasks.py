@@ -83,7 +83,7 @@ def run_daily_etl_pipeline(self, target_date_str: str = None):
         # Create job execution record
         job_id = await ingest_service.create_job(
             job_name="daily_etl_pipeline",
-            metadata={
+            job_metadata={
                 "target_date": target_date.isoformat(),
                 "celery_task_id": self.request.id,
                 "started_at": datetime.utcnow().isoformat()

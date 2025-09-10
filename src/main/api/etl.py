@@ -20,7 +20,7 @@ class TriggerJobRequest(BaseModel):
     """Request to trigger an ETL job."""
     job_name: str = Field(..., description="Job name to execute")
     target_date: Optional[str] = Field(None, description="Target date (YYYY-MM-DD)")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional job metadata")
+    job_metadata: Optional[Dict[str, Any]] = Field(None, description="Additional job metadata")
 
 
 class JobStatusResponse(BaseModel):

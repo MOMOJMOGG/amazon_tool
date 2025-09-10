@@ -51,7 +51,7 @@ class JobExecution(Base):
     records_processed = Column(Integer, default=0)
     records_failed = Column(Integer, default=0)
     error_message = Column(Text, nullable=True)
-    metadata = Column(JSON, nullable=True)  # Additional job-specific data
+    job_metadata = Column(JSON, nullable=True)  # Additional job-specific data
     created_at = Column(DateTime, default=datetime.utcnow)
     
     def __repr__(self):
@@ -71,7 +71,7 @@ class RawProductEventCreate(BaseModel):
 class JobExecutionCreate(BaseModel):
     """Model for creating job execution records."""
     job_name: str = Field(..., description="Job name identifier")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Job metadata")
+    job_metadata: Optional[Dict[str, Any]] = Field(None, description="Job metadata")
 
 
 class JobExecutionUpdate(BaseModel):
@@ -80,7 +80,7 @@ class JobExecutionUpdate(BaseModel):
     records_processed: Optional[int] = Field(None, description="Records processed count")
     records_failed: Optional[int] = Field(None, description="Records failed count") 
     error_message: Optional[str] = Field(None, description="Error message if failed")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Updated metadata")
+    job_metadata: Optional[Dict[str, Any]] = Field(None, description="Updated metadata")
 
 
 class JobExecutionResponse(BaseModel):

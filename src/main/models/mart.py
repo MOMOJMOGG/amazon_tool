@@ -13,9 +13,9 @@ class ProductSummary(Base):
     
     __tablename__ = "product_summary"
     __table_args__ = (
-        {"schema": "mart"},
         Index("idx_product_summary_asin", "asin"),
         Index("idx_product_summary_updated", "last_updated"),
+        {"schema": "mart"}
     )
     
     asin = Column(String, primary_key=True, index=True)
@@ -55,8 +55,8 @@ class DailyAggregates(Base):
     
     __tablename__ = "daily_aggregates"
     __table_args__ = (
-        {"schema": "mart"},
         Index("idx_daily_aggregates_date", "date"),
+        {"schema": "mart"}
     )
     
     date = Column(Date, primary_key=True, index=True)
@@ -97,10 +97,10 @@ class PriceAlerts(Base):
     
     __tablename__ = "price_alerts"
     __table_args__ = (
-        {"schema": "mart"},
         Index("idx_price_alerts_asin", "asin"),
         Index("idx_price_alerts_created", "created_at"),
         Index("idx_price_alerts_resolved", "resolved_at"),
+        {"schema": "mart"}
     )
     
     id = Column(String, primary_key=True)
