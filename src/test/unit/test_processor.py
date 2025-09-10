@@ -50,10 +50,10 @@ class TestCoreMetricsProcessor:
         with patch('src.main.services.processor.ingest_service') as mock_ingest, \
              patch('src.main.services.processor.get_db_session') as mock_session:
             
-            # Mock events
+            # Mock events - these are async methods
             mock_events = [MagicMock(), MagicMock()]
-            mock_ingest.get_unprocessed_events.return_value = mock_events
-            mock_ingest.mark_events_processed.return_value = 2
+            mock_ingest.get_unprocessed_events = AsyncMock(return_value=mock_events)
+            mock_ingest.mark_events_processed = AsyncMock(return_value=2)
             
             # Mock database session
             mock_db = AsyncMock()
@@ -76,10 +76,10 @@ class TestCoreMetricsProcessor:
         with patch('src.main.services.processor.ingest_service') as mock_ingest, \
              patch('src.main.services.processor.get_db_session') as mock_session:
             
-            # Mock events
+            # Mock events - these are async methods
             mock_events = [MagicMock(), MagicMock(), MagicMock()]
-            mock_ingest.get_unprocessed_events.return_value = mock_events
-            mock_ingest.mark_events_processed.return_value = 2
+            mock_ingest.get_unprocessed_events = AsyncMock(return_value=mock_events)
+            mock_ingest.mark_events_processed = AsyncMock(return_value=2)
             
             # Mock database session
             mock_db = AsyncMock()
@@ -101,7 +101,7 @@ class TestCoreMetricsProcessor:
     async def test_process_product_events_no_events(self, processor):
         """Test processing when no events are found."""
         with patch('src.main.services.processor.ingest_service') as mock_ingest:
-            mock_ingest.get_unprocessed_events.return_value = []
+            mock_ingest.get_unprocessed_events = AsyncMock(return_value=[])
             
             processed, failed = await processor.process_product_events("job-123")
             
@@ -135,9 +135,9 @@ class TestCoreMetricsProcessor:
         mock_session = AsyncMock()
         
         # Mock no existing product
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = None
-        mock_session.execute.return_value = mock_result
+        mock_session.execute = AsyncMock(return_value=mock_result)
         
         await processor._upsert_product(mock_session, sample_raw_event)
         
@@ -159,9 +159,9 @@ class TestCoreMetricsProcessor:
         existing_product.title = "Old Title"
         existing_product.brand = "Old Brand"
         
-        mock_result = AsyncMock()
+        mock_result = MagicMock()
         mock_result.scalar_one_or_none.return_value = existing_product
-        mock_session.execute.return_value = mock_result
+        mock_session.execute = AsyncMock(return_value=mock_result)
         
         await processor._upsert_product(mock_session, sample_raw_event)
         
@@ -190,14 +190,18 @@ class TestCoreMetricsProcessor:
             mock_db = AsyncMock()
             mock_session.return_value.__aenter__.return_value = mock_db
             
-            # Mock query results
-            total_result = AsyncMock()
-            total_result.scalars.return_value.all.return_value = ["e1", "e2", "e3"]
+            # Mock query results - scalars() returns synchronously
+            total_scalars = MagicMock()
+            total_scalars.all.return_value = ["e1", "e2", "e3"]
+            total_result = MagicMock()
+            total_result.scalars.return_value = total_scalars
             
-            processed_result = AsyncMock()
-            processed_result.scalars.return_value.all.return_value = ["e1", "e2"]
+            processed_scalars = MagicMock()
+            processed_scalars.all.return_value = ["e1", "e2"]
+            processed_result = MagicMock()
+            processed_result.scalars.return_value = processed_scalars
             
-            mock_db.execute.side_effect = [total_result, processed_result]
+            mock_db.execute = AsyncMock(side_effect=[total_result, processed_result])
             
             stats = await processor.get_processing_stats("job-123")
             
