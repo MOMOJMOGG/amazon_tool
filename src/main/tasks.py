@@ -71,6 +71,10 @@ def run_daily_etl_pipeline(self, target_date_str: str = None):
         target_date_str: ISO date string (YYYY-MM-DD), defaults to today
     """
     async def _run_pipeline():
+        # Initialize database connection for this worker process
+        from src.main.database import init_db
+        await init_db()
+        
         from src.main.services.ingest import ingest_service
         from src.main.services.processor import core_processor
         from src.main.services.mart import mart_processor
@@ -143,6 +147,10 @@ def refresh_product_summaries(self, target_date_str: str = None):
         target_date_str: ISO date string (YYYY-MM-DD), defaults to today
     """
     async def _refresh_summaries():
+        # Initialize database connection for this worker process
+        from src.main.database import init_db
+        await init_db()
+        
         from src.main.services.mart import mart_processor
         
         target_date = datetime.fromisoformat(target_date_str).date() if target_date_str else date.today()
@@ -177,6 +185,10 @@ def compute_daily_aggregates(self, target_date_str: str = None):
         target_date_str: ISO date string (YYYY-MM-DD), defaults to today
     """
     async def _compute_aggregates():
+        # Initialize database connection for this worker process
+        from src.main.database import init_db
+        await init_db()
+        
         from src.main.services.mart import mart_processor
         
         target_date = datetime.fromisoformat(target_date_str).date() if target_date_str else date.today()
@@ -211,6 +223,10 @@ def process_daily_alerts(self, target_date_str: str = None):
         target_date_str: ISO date string (YYYY-MM-DD), defaults to today
     """
     async def _process_alerts():
+        # Initialize database connection for this worker process
+        from src.main.database import init_db
+        await init_db()
+        
         from src.main.services.alerts import alert_service
         
         target_date = datetime.fromisoformat(target_date_str).date() if target_date_str else date.today()
