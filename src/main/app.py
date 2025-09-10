@@ -8,7 +8,7 @@ import asyncio
 from datetime import datetime
 from typing import Dict, Any
 
-from .config import settings
+from app.config import settings
 
 # Configure logging
 logging.basicConfig(
@@ -36,8 +36,8 @@ app.add_middleware(
 )
 
 # Include API routers
-from .api.products import router as products_router
-from .api.metrics import router as metrics_router
+from app.api.products import router as products_router
+from app.api.metrics import router as metrics_router
 
 app.include_router(products_router)
 app.include_router(metrics_router)
@@ -51,8 +51,8 @@ async def startup_event():
     logger.info(f"Log Level: {settings.log_level}")
     
     # Import here to avoid circular imports
-    from .database import init_db
-    from .services.cache import init_redis
+    from app.database import init_db
+    from app.services.cache import init_redis
     
     try:
         # Initialize database connection
@@ -73,8 +73,8 @@ async def shutdown_event():
     """Cleanup on application shutdown."""
     logger.info("Shutting down Amazon Product Monitoring Tool")
     
-    from .database import close_db
-    from .services.cache import close_redis
+    from app.database import close_db
+    from app.services.cache import close_redis
     
     try:
         await close_db()
@@ -88,8 +88,8 @@ async def shutdown_event():
 async def health_check() -> Dict[str, Any]:
     """Health check endpoint."""
     try:
-        from .database import check_db_health
-        from .services.cache import check_redis_health
+        from app.database import check_db_health
+        from app.services.cache import check_redis_health
         
         # Check database health
         db_healthy = await check_db_health()

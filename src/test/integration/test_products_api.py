@@ -6,7 +6,7 @@ from httpx import AsyncClient
 import json
 from datetime import datetime
 
-from src.main.app import app
+from app.app import app
 
 
 class TestProductsAPI:
@@ -16,8 +16,8 @@ class TestProductsAPI:
     async def test_health_endpoint(self):
         """Test health check endpoint."""
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            with patch('src.main.database.check_db_health') as mock_db_health, \
-                 patch('src.main.services.cache.check_redis_health') as mock_redis_health:
+            with patch('app.database.check_db_health') as mock_db_health, \
+                 patch('app.services.cache.check_redis_health') as mock_redis_health:
                 
                 mock_db_health.return_value = True
                 mock_redis_health.return_value = True
@@ -36,8 +36,8 @@ class TestProductsAPI:
     async def test_health_endpoint_unhealthy(self):
         """Test health check endpoint when services are unhealthy."""
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            with patch('src.main.database.check_db_health') as mock_db_health, \
-                 patch('src.main.services.cache.check_redis_health') as mock_redis_health:
+            with patch('app.database.check_db_health') as mock_db_health, \
+                 patch('app.services.cache.check_redis_health') as mock_redis_health:
                 
                 mock_db_health.return_value = False
                 mock_redis_health.return_value = True
@@ -78,7 +78,7 @@ class TestProductsAPI:
     async def test_get_product_not_found(self, sample_product_data):
         """Test get product that doesn't exist."""
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            with patch('src.main.api.products.fetch_product_with_metrics') as mock_fetch:
+            with patch('app.api.products.fetch_product_with_metrics') as mock_fetch:
                 mock_fetch.return_value = None
                 
                 response = await ac.get("/v1/products/B123456789")
@@ -90,12 +90,12 @@ class TestProductsAPI:
     @pytest.mark.asyncio
     async def test_get_product_cache_miss(self, sample_product_data):
         """Test get product with cache miss."""
-        from src.main.models.product import ProductWithMetrics
+        from app.models.product import ProductWithMetrics
         
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            with patch('src.main.services.cache.cache.get_or_set') as mock_cache, \
-                 patch('src.main.api.products.record_product_request') as mock_record_product, \
-                 patch('src.main.api.products.record_cache_operation') as mock_record_cache:
+            with patch('app.services.cache.cache.get_or_set') as mock_cache, \
+                 patch('app.api.products.record_product_request') as mock_record_product, \
+                 patch('app.api.products.record_cache_operation') as mock_record_cache:
                 
                 # Mock cache miss
                 mock_cache.return_value = (sample_product_data, False, None)
@@ -120,9 +120,9 @@ class TestProductsAPI:
         stale_at = datetime.utcnow()
         
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            with patch('src.main.services.cache.cache.get_or_set') as mock_cache, \
-                 patch('src.main.api.products.record_product_request') as mock_record_product, \
-                 patch('src.main.api.products.record_cache_operation') as mock_record_cache:
+            with patch('app.services.cache.cache.get_or_set') as mock_cache, \
+                 patch('app.api.products.record_product_request') as mock_record_product, \
+                 patch('app.api.products.record_cache_operation') as mock_record_cache:
                 
                 # Mock cache hit
                 mock_cache.return_value = (sample_product_data, True, stale_at)

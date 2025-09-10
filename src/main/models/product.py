@@ -5,7 +5,7 @@ from typing import Optional
 from sqlalchemy import Column, String, DateTime, Numeric, Integer, Text
 from pydantic import BaseModel, Field
 
-from ..database import Base
+from app.database import Base
 
 
 class Product(Base):

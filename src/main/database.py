@@ -8,7 +8,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
-from .config import settings
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -25,8 +25,12 @@ async def init_db() -> None:
     global engine, SessionLocal
     
     try:
-        # Create async engine for Supabase PostgreSQL
-        database_url = f"postgresql+asyncpg://{_extract_db_credentials()}"
+        # Create async engine using DATABASE_URL
+        database_url = settings.database_url
+        if not database_url.startswith("postgresql+asyncpg://"):
+            # Convert postgresql:// to postgresql+asyncpg://
+            if database_url.startswith("postgresql://"):
+                database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
         
         engine = create_async_engine(
             database_url,
@@ -54,23 +58,6 @@ async def init_db() -> None:
         logger.error(f"Failed to initialize database: {e}")
         raise
 
-
-def _extract_db_credentials() -> str:
-    """Extract database credentials from Supabase URL and key."""
-    # Supabase URL format: https://xxx.supabase.co
-    # We need to construct: user:pass@host:port/dbname
-    
-    # Extract host from Supabase URL
-    host = settings.supabase_url.replace("https://", "").replace("http://", "")
-    
-    # For Supabase, we use the service_role key as password
-    # Username is typically 'postgres'
-    user = "postgres"
-    password = settings.supabase_key
-    port = "5432"
-    dbname = "postgres"
-    
-    return f"{user}:{password}@{host}:{port}/{dbname}"
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

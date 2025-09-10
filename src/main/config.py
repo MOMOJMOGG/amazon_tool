@@ -13,8 +13,7 @@ class Settings(BaseSettings):
     """Application configuration settings."""
     
     # Database Configuration
-    supabase_url: str = Field(..., env="SUPABASE_URL")
-    supabase_key: str = Field(..., env="SUPABASE_KEY")
+    database_url: str = Field(..., env="DATABASE_URL")
     
     # Redis Configuration  
     redis_url: str = Field(default="redis://localhost:6379", env="REDIS_URL")
