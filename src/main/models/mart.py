@@ -117,7 +117,7 @@ class PriceAlerts(Base):
     # Context
     baseline_value = Column(Numeric(10, 2), nullable=True)  # 30-day average
     message = Column(Text, nullable=True)
-    metadata = Column(Text, nullable=True)  # JSON string with additional context
+    alert_metadata = Column(Text, nullable=True)  # JSON string with additional context
     
     # Status tracking
     is_resolved = Column(String, default="false")  # "true"/"false" as string for compatibility
