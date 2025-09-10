@@ -1,7 +1,7 @@
 """Configuration settings for the Amazon Product Monitoring Tool."""
 
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 import os
 from dotenv import load_dotenv
@@ -13,27 +13,28 @@ load_dotenv()
 class Settings(BaseSettings):
     """Application configuration settings."""
     
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        case_sensitive=False
+    )
+    
     # Database Configuration
-    database_url: str = Field(..., env="DATABASE_URL")
+    database_url: str
     
     # Redis Configuration  
-    redis_url: str = Field(default="redis://localhost:6379", env="REDIS_URL")
+    redis_url: str = "redis://localhost:6379"
     
     # Application Configuration
-    log_level: str = Field(default="INFO", env="LOG_LEVEL")
-    environment: str = Field(default="development", env="ENVIRONMENT")
+    log_level: str = "INFO"
+    environment: str = "development"
     
     # API Configuration
-    api_host: str = Field(default="0.0.0.0", env="API_HOST")
-    api_port: int = Field(default=8000, env="API_PORT")
+    api_host: str = "0.0.0.0"
+    api_port: int = 8000
     
     # Cache Configuration
-    cache_ttl_seconds: int = Field(default=86400, env="CACHE_TTL_SECONDS")  # 24 hours
-    cache_stale_seconds: int = Field(default=3600, env="CACHE_STALE_SECONDS")  # 1 hour
-    
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
+    cache_ttl_seconds: int = 86400  # 24 hours
+    cache_stale_seconds: int = 3600  # 1 hour
 
 
 # Global settings instance
