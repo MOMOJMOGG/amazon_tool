@@ -153,12 +153,14 @@ class TestIngestionService:
             mock_db = AsyncMock()
             mock_session.return_value.__aenter__.return_value = mock_db
             
-            # Mock query result
+            # Mock query result - scalars() returns synchronously, all() is sync too
             mock_scalars = MagicMock()
             mock_scalars.all.return_value = ["event1", "event2"]
-            mock_result = AsyncMock()
+            
+            mock_result = MagicMock()
             mock_result.scalars.return_value = mock_scalars
-            mock_db.execute.return_value = mock_result
+            
+            mock_db.execute = AsyncMock(return_value=mock_result)
             
             events = await ingest_service.get_unprocessed_events(job_id="test-job", limit=10)
             
