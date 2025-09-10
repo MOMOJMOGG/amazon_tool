@@ -266,6 +266,58 @@ class CacheService:
         except RedisError as e:
             logger.error(f"Failed to delete keys with pattern {pattern}: {e}")
             return 0
+    
+    async def get(self, key: str) -> Any:
+        """Get value from cache (simple get without SWR pattern)."""
+        if not redis_client:
+            return None
+        
+        try:
+            cached_data = await redis_client.get(key)
+            if cached_data:
+                try:
+                    entry = CacheEntry.from_dict(json.loads(cached_data))
+                    if not entry.is_expired:
+                        return entry.data
+                    else:
+                        # Clean up expired entry
+                        await redis_client.delete(key)
+                except (json.JSONDecodeError, KeyError, ValueError) as e:
+                    logger.warning(f"Invalid cache entry for key {key}: {e}")
+                    await redis_client.delete(key)
+            return None
+        except RedisError as e:
+            logger.error(f"Redis error for key {key}: {e}")
+            return None
+    
+    async def set(self, key: str, value: Any, ttl: int = None) -> bool:
+        """Set value in cache (simple set without SWR metadata)."""
+        if not redis_client:
+            return False
+        
+        try:
+            ttl = ttl or settings.cache_ttl_seconds
+            entry = CacheEntry(
+                data=value,
+                cached_at=datetime.utcnow(),
+                ttl_seconds=ttl,
+                stale_seconds=ttl // 2  # Default stale time is half of TTL
+            )
+            
+            await redis_client.setex(
+                key,
+                ttl,
+                json.dumps(entry.to_dict(), default=str)
+            )
+            logger.debug(f"Cache set for key: {key}")
+            return True
+            
+        except RedisError as e:
+            logger.error(f"Failed to set cache for key {key}: {e}")
+            return False
+        except (TypeError, ValueError) as e:
+            logger.error(f"Failed to serialize data for key {key}: {e}")
+            return False
 
 
 # Global cache service instance

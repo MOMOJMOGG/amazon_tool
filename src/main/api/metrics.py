@@ -43,6 +43,12 @@ product_requests_total = Counter(
     ["asin", "cached"]  # cached: true/false
 )
 
+competition_requests_total = Counter(
+    "competition_requests_total",
+    "Total number of competition analysis requests",
+    ["operation"]  # operation: competition_data/competitor_setup/competitor_removal
+)
+
 
 @router.get("/metrics")
 async def get_metrics():
@@ -93,3 +99,8 @@ def set_database_connections(count: int):
 def set_redis_connections(count: int):
     """Set active Redis connections gauge."""
     redis_connections_active.set(count)
+
+
+async def record_competition_request(operation: str):
+    """Record competition analysis request metrics."""
+    competition_requests_total.labels(operation=operation).inc()

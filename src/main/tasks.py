@@ -45,6 +45,10 @@ celery_app.conf.beat_schedule = {
         "task": "src.main.tasks.refresh_product_summaries",
         "schedule": crontab(hour=3, minute=30),  # Run at 3:30 AM UTC daily
     },
+    "calculate-competitor-comparisons": {
+        "task": "src.main.tasks.calculate_daily_competitor_comparisons",
+        "schedule": crontab(hour=3, minute=45),  # Run at 3:45 AM UTC daily
+    },
     "process-alerts": {
         "task": "src.main.tasks.process_daily_alerts",
         "schedule": crontab(hour=4, minute=0),  # Run at 4:00 AM UTC daily
@@ -300,3 +304,46 @@ def health_check():
         "timestamp": datetime.utcnow().isoformat(),
         "worker_id": health_check.request.id
     }
+
+
+@celery_app.task(bind=True, name="src.main.tasks.calculate_daily_competitor_comparisons")
+def calculate_daily_competitor_comparisons(self, target_date_str: str = None):
+    """
+    Calculate competitor comparisons for all competitor pairs.
+    
+    Args:
+        target_date_str: ISO date string (YYYY-MM-DD), defaults to today
+    """
+    async def _calculate_comparisons():
+        # Initialize database connection for this worker process
+        from src.main.database import init_db
+        await init_db()
+        
+        from src.main.services.comparison import comparison_service
+        from src.main.services.cache import cache
+        
+        target_date = datetime.fromisoformat(target_date_str).date() if target_date_str else date.today()
+        
+        logger.info(f"Calculating competitor comparisons for {target_date}")
+        
+        processed, failed = await comparison_service.calculate_daily_comparisons(target_date)
+        
+        # Clear related caches after calculation
+        await cache.delete_pattern("competition:*")
+        
+        result = {
+            "target_date": target_date.isoformat(),
+            "comparisons_processed": processed,
+            "comparisons_failed": failed,
+            "status": "completed"
+        }
+        
+        logger.info(f"Competitor comparisons calculated: {result}")
+        return result
+    
+    try:
+        return run_async_task(_calculate_comparisons)
+        
+    except Exception as e:
+        logger.error(f"Daily competitor comparison calculation failed: {e}")
+        raise self.retry(exc=e, countdown=60, max_retries=3)

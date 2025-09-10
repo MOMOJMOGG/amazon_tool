@@ -127,5 +127,5 @@ async def close_db() -> None:
 # Import all models to register them with SQLAlchemy Base
 def register_models():
     """Import all models to register them with SQLAlchemy."""
-    from src.main.models import product, staging, mart
+    from src.main.models import product, staging, mart, competition
     # Models are registered when imported

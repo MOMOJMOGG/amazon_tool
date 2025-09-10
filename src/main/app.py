@@ -39,10 +39,12 @@ app.add_middleware(
 from src.main.api.products import router as products_router
 from src.main.api.metrics import router as metrics_router
 from src.main.api.etl import router as etl_router
+from src.main.api.competitions import router as competitions_router
 
 app.include_router(products_router)
 app.include_router(metrics_router)
 app.include_router(etl_router)
+app.include_router(competitions_router)
 
 
 @app.on_event("startup")
