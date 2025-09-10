@@ -68,7 +68,7 @@ class TestAlertService:
             mock_previous.price = 40.0
             mock_previous.bsr = 1000
             
-            prev_result = AsyncMock()
+            prev_result = MagicMock()
             prev_result.scalar_one_or_none.return_value = mock_previous
             
             # Mock product summary (for baseline)
@@ -76,10 +76,10 @@ class TestAlertService:
             mock_summary.avg_price_30d = 42.0
             mock_summary.avg_bsr_30d = 1100.0
             
-            summary_result = AsyncMock()
+            summary_result = MagicMock()
             summary_result.scalar_one_or_none.return_value = mock_summary
             
-            mock_db.execute.side_effect = [prev_result, summary_result]
+            mock_db.execute = AsyncMock(side_effect=[prev_result, summary_result])
             
             alerts = await alert_service._detect_product_alerts(
                 mock_db, "B08N5WRWNW", date.today(), date.today() - timedelta(days=1),
@@ -104,7 +104,7 @@ class TestAlertService:
             mock_previous.price = 50.0
             mock_previous.bsr = 1500
             
-            prev_result = AsyncMock()
+            prev_result = MagicMock()
             prev_result.scalar_one_or_none.return_value = mock_previous
             
             # Mock product summary
@@ -112,10 +112,10 @@ class TestAlertService:
             mock_summary.avg_price_30d = 50.0
             mock_summary.avg_bsr_30d = 1400.0
             
-            summary_result = AsyncMock()
+            summary_result = MagicMock()
             summary_result.scalar_one_or_none.return_value = mock_summary
             
-            mock_db.execute.side_effect = [prev_result, summary_result]
+            mock_db.execute = AsyncMock(side_effect=[prev_result, summary_result])
             
             alerts = await alert_service._detect_product_alerts(
                 mock_db, "B08N5WRWNW", date.today(), date.today() - timedelta(days=1),
@@ -190,11 +190,13 @@ class TestAlertService:
             mock_db = AsyncMock()
             mock_session.return_value.__aenter__.return_value = mock_db
             
-            # Mock query result
+            # Mock query result - scalars() returns synchronously
             mock_alerts = [MagicMock(), MagicMock()]
-            mock_result = AsyncMock()
-            mock_result.scalars.return_value.all.return_value = mock_alerts
-            mock_db.execute.return_value = mock_result
+            mock_scalars = MagicMock()
+            mock_scalars.all.return_value = mock_alerts
+            mock_result = MagicMock()
+            mock_result.scalars.return_value = mock_scalars
+            mock_db.execute = AsyncMock(return_value=mock_result)
             
             alerts = await alert_service.get_active_alerts(asin="B08N5WRWNW", limit=10)
             
@@ -233,8 +235,10 @@ class TestAlertService:
             ]
             
             # Mock total and active counts
-            mock_db.execute.return_value.all.return_value = mock_breakdown
-            mock_db.scalar.side_effect = [10, 3]  # total_alerts, active_alerts
+            mock_execute_result = MagicMock()
+            mock_execute_result.all.return_value = mock_breakdown
+            mock_db.execute = AsyncMock(return_value=mock_execute_result)
+            mock_db.scalar = AsyncMock(side_effect=[10, 3])  # total_alerts, active_alerts
             
             summary = await alert_service.get_alert_summary(days=7)
             
