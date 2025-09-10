@@ -94,8 +94,8 @@ async def check_db_health() -> bool:
         return False
 
 
-async def get_db_session() -> AsyncSession:
-    """Get a database session for direct use (not dependency injection)."""
+def get_db_session():
+    """Get a database session context manager for direct use (not dependency injection)."""
     if not SessionLocal:
         raise RuntimeError("Database not initialized")
     
