@@ -94,6 +94,14 @@ async def check_db_health() -> bool:
         return False
 
 
+async def get_db_session() -> AsyncSession:
+    """Get a database session for direct use (not dependency injection)."""
+    if not SessionLocal:
+        raise RuntimeError("Database not initialized")
+    
+    return SessionLocal()
+
+
 async def close_db() -> None:
     """Close database connections."""
     global engine
@@ -102,3 +110,10 @@ async def close_db() -> None:
         await engine.dispose()
         engine = None
         logger.info("Database connections closed")
+
+
+# Import all models to register them with SQLAlchemy Base
+def register_models():
+    """Import all models to register them with SQLAlchemy."""
+    from src.main.models import product, staging, mart
+    # Models are registered when imported

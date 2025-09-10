@@ -9,6 +9,10 @@ from fastapi.testclient import TestClient
 
 from src.main.app import app
 from src.main.config import Settings
+from src.main.database import register_models
+
+# Register all models for testing
+register_models()
 
 
 @pytest.fixture(scope="session")

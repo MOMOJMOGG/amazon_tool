@@ -38,9 +38,11 @@ app.add_middleware(
 # Include API routers
 from src.main.api.products import router as products_router
 from src.main.api.metrics import router as metrics_router
+from src.main.api.etl import router as etl_router
 
 app.include_router(products_router)
 app.include_router(metrics_router)
+app.include_router(etl_router)
 
 
 @app.on_event("startup")
@@ -51,10 +53,14 @@ async def startup_event():
     logger.info(f"Log Level: {settings.log_level}")
     
     # Import here to avoid circular imports
-    from src.main.database import init_db
+    from src.main.database import init_db, register_models
     from src.main.services.cache import init_redis
     
     try:
+        # Register all database models
+        register_models()
+        logger.info("Database models registered")
+        
         # Initialize database connection
         await init_db()
         logger.info("Database connection initialized")
