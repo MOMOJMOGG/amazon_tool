@@ -48,8 +48,20 @@ async def init_db() -> None:
             expire_on_commit=False
         )
         
-        # Test connection
+        # Import and register all models
+        register_models()
+        
+        # Create all tables
         async with engine.begin() as conn:
+            # Create schemas first
+            await conn.execute(text("CREATE SCHEMA IF NOT EXISTS staging"))
+            await conn.execute(text("CREATE SCHEMA IF NOT EXISTS core"))
+            await conn.execute(text("CREATE SCHEMA IF NOT EXISTS mart"))
+            
+            # Create all tables
+            await conn.run_sync(Base.metadata.create_all)
+            
+            # Test connection
             await conn.execute(text("SELECT 1"))
         
         logger.info("Database initialized successfully")
