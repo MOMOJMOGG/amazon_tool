@@ -8,10 +8,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.database import get_db
-from app.models.product import Product, ProductMetricsDaily, ProductResponse, ProductWithMetrics
-from app.services.cache import cache
-from app.api.metrics import record_product_request, record_cache_operation
+from src.main.database import get_db
+from src.main.models.product import Product, ProductMetricsDaily, ProductResponse, ProductWithMetrics
+from src.main.services.cache import cache
+from src.main.api.metrics import record_product_request, record_cache_operation
 
 logger = logging.getLogger(__name__)
 

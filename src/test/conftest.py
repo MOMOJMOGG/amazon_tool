@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 from httpx import AsyncClient
 from fastapi.testclient import TestClient
 
-from app.app import app
-from app.config import Settings
+from src.main.app import app
+from src.main.config import Settings
 
 
 @pytest.fixture(scope="session")

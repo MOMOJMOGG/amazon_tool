@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch, MagicMock
 import json
 
-from app.services.cache import CacheEntry, CacheService
+from src.main.services.cache import CacheEntry, CacheService
 
 
 class TestCacheEntry:
@@ -81,7 +81,7 @@ class TestCacheService:
     @pytest.mark.asyncio
     async def test_cache_miss(self, cache_service, mock_redis):
         """Test cache miss scenario."""
-        with patch('app.services.cache.redis_client', mock_redis):
+        with patch('src.main.services.cache.redis_client', mock_redis):
             mock_redis.get.return_value = None
             
             async def fetch_func():
@@ -110,7 +110,7 @@ class TestCacheService:
         )
         mock_redis.get.return_value = json.dumps(entry.to_dict(), default=str)
         
-        with patch('app.services.cache.redis_client', mock_redis):
+        with patch('src.main.services.cache.redis_client', mock_redis):
             async def fetch_func():
                 return {"data": "fresh_from_db"}
             
@@ -136,7 +136,7 @@ class TestCacheService:
         )
         mock_redis.get.return_value = json.dumps(entry.to_dict(), default=str)
         
-        with patch('app.services.cache.redis_client', mock_redis):
+        with patch('src.main.services.cache.redis_client', mock_redis):
             async def fetch_func():
                 return {"data": "fresh_from_db"}
             
@@ -162,7 +162,7 @@ class TestCacheService:
         )
         mock_redis.get.return_value = json.dumps(entry.to_dict(), default=str)
         
-        with patch('app.services.cache.redis_client', mock_redis):
+        with patch('src.main.services.cache.redis_client', mock_redis):
             async def fetch_func():
                 return {"data": "fresh_from_db"}
             
@@ -179,7 +179,7 @@ class TestCacheService:
     @pytest.mark.asyncio
     async def test_redis_unavailable(self, cache_service):
         """Test behavior when Redis is unavailable."""
-        with patch('app.services.cache.redis_client', None):
+        with patch('src.main.services.cache.redis_client', None):
             async def fetch_func():
                 return {"data": "direct_from_db"}
             

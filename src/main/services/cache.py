@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional, Tuple, Callable
 import redis.asyncio as redis
 from redis.exceptions import RedisError
 
-from app.config import settings
+from src.main.config import settings
 
 logger = logging.getLogger(__name__)
 
