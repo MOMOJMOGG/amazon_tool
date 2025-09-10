@@ -7,6 +7,7 @@ Build a FastAPI backend for Amazon product tracking and competitive analysis wit
 - **M3**: Competition engine (competitor setup + comparison APIs)
 - **M4**: Batch optimization (rate limiting + ETag + cache invalidation)
 - **M5**: GraphQL + LLM reports (persisted queries + competitive reports)
+- **M6**: Edge & Deploy (Nginx/Gateway)
 
 ## Key Technical Decisions
 - **Read-heavy optimization**: Mart layer for pre-computed data + Redis SWR cache (24-48h TTL)
@@ -59,6 +60,7 @@ Build a FastAPI backend for Amazon product tracking and competitive analysis wit
 | M3 | Competition Engine Core | Competitor links + comparison API | Competition setup/query endpoints, daily comparison data | M2, competitor tables | ✓ |
 | M4 | Batch APIs + Optimization | Rate limiting + ETag + cache invalidation | Batch endpoints, 304 responses, pub/sub invalidation | M3, Redis pub/sub | ✓ |
 | M5 | GraphQL + Reports | Persisted queries + LLM reports | GraphQL endpoint, competition reports generated | M4, Strawberry setup | ✓ |
+| M6 | Edge & Deploy | Nginx reverse proxy + micro-cache | Config loads, health/metrics work, cache HIT/MISS headers, rate limiting | M4 completed | ✓ |
 
 ## (C) Tickets List by Milestone
 
@@ -128,6 +130,21 @@ Build a FastAPI backend for Amazon product tracking and competitive analysis wit
 - GQL-002 (L): GraphQL resolvers + cache integration
   - Files: `src/main/graphql/resolvers.py`
   - AC: GraphQL queries hit Redis cache, avoid N+1
+
+**M6: Edge & Deploy**
+
+**Scope:** Nginx reverse proxy in front of FastAPI (uvicorn workers), health checks, gzip/brotli, rate limiting, request body limits, timeouts; micro-cache for safe GETs (1–10s) — REST uses path+query as key with ETag/304; GraphQL (persisted queries only) uses op=<sha256> and vh=<vars_sha256> in cache key; no cache when Authorization present; pass /metrics and /health unbuffered.
+
+**Acceptance Criteria:**
+- baseline config loads with nginx -t
+- 200 OK for /health, /metrics, and a sample GET
+- micro-cache shows HIT/MISS header
+- 429 on abusive rate
+- config snippets documented in plan
+
+**Dependencies:** M4 completed (ETag + batch + cache invalidation).
+
+**Deliverables:** Nginx config snippets in the plan (no Dockerfile yet), ops notes for TLS termination (cloud/CDN vs self-managed).
 
 ## (D) Test Plan Summary
 
