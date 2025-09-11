@@ -26,6 +26,7 @@ class RealTestData:
         "B0FDKB341G",  # Another real ASIN found in tests
         "B0DNBQ6HPR",  # Backup real ASIN  
         "B0D9GYS7BX",  # Additional real ASIN
+        "B0F6BJSTSQ",  # Fourth alternative ASIN for batch tests
     ]
     
     # Real product data structure (based on actual database schema)
