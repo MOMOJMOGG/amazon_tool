@@ -12,8 +12,8 @@ import openai
 
 from src.main.config import settings
 from src.main.models.competition import CompetitionReport, CompetitorComparisonDaily
-from src.main.models.mart import ProductMetricsDaily, ProductMetricsRollup
-from src.main.models.product import Product
+from src.main.models.product import Product, ProductMetricsDaily
+from src.main.models.mart import ProductSummary
 from src.main.database import get_async_session
 
 logger = logging.getLogger(__name__)
@@ -438,22 +438,21 @@ Focus on actionable insights and quantify differences where possible.
     ) -> Dict[str, Any]:
         """Calculate market-level analysis metrics."""
         try:
-            # Get rollup data for all ASINs if available
+            # Get summary data for all ASINs if available
             result = await session.execute(
-                select(ProductMetricsRollup)
-                .where(ProductMetricsRollup.asin.in_(all_asins))
-                .order_by(ProductMetricsRollup.as_of.desc())
+                select(ProductSummary)
+                .where(ProductSummary.asin.in_(all_asins))
             )
             
-            rollups = result.scalars().all()
+            summaries = result.scalars().all()
             
-            if not rollups:
+            if not summaries:
                 return {'status': 'insufficient_data'}
             
             # Calculate market statistics
-            prices = [float(r.price_avg) for r in rollups if r.price_avg]
-            bsrs = [float(r.bsr_avg) for r in rollups if r.bsr_avg]
-            ratings = [float(r.rating_avg) for r in rollups if r.rating_avg]
+            prices = [float(s.avg_price_30d) for s in summaries if s.avg_price_30d]
+            bsrs = [float(s.avg_bsr_30d) for s in summaries if s.avg_bsr_30d]
+            ratings = [float(s.latest_rating) for s in summaries if s.latest_rating]
             
             return {
                 'market_price_range': {
@@ -466,7 +465,7 @@ Focus on actionable insights and quantify differences where possible.
                     'worst': max(bsrs) if bsrs else None
                 },
                 'market_rating_avg': sum(ratings) / len(ratings) if ratings else None,
-                'products_analyzed': len(rollups),
+                'products_analyzed': len(summaries),
                 'analysis_period': f"{start_date} to {end_date}"
             }
             

@@ -7,8 +7,8 @@ from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
-from src.main.models.product import Product as ProductModel
-from src.main.models.mart import ProductMetricsDaily, ProductMetricsRollup, ProductMetricsDeltaDaily
+from src.main.models.product import Product as ProductModel, ProductMetricsDaily
+from src.main.models.mart import ProductSummary
 from src.main.models.competition import CompetitorComparisonDaily, CompetitionReport
 from src.main.graphql.types import ProductMetrics, ProductRollup, ProductDelta, PeerGap, Range
 
@@ -95,30 +95,24 @@ class ProductRollupLoader(DataLoader):
             end_date = date.today()
             
             result = await self.db_session.execute(
-                select(ProductMetricsRollup)
-                .where(
-                    and_(
-                        ProductMetricsRollup.asin.in_(asins),
-                        ProductMetricsRollup.as_of >= end_date - timedelta(days=90)  # Max range
-                    )
-                )
-                .order_by(ProductMetricsRollup.asin, ProductMetricsRollup.as_of.desc())
+                select(ProductSummary)
+                .where(ProductSummary.asin.in_(asins))
             )
             
-            rollups = result.scalars().all()
+            summaries = result.scalars().all()
             
             # Create mapping for (asin, range) -> rollup
             rollup_map = {}
-            for rollup in rollups:
-                # For simplicity, map to ASIN (ignoring range specificity for now)
-                if rollup.asin not in rollup_map:
-                    rollup_map[rollup.asin] = ProductRollup(
-                        as_of=rollup.as_of,
-                        price_avg=float(rollup.price_avg) if rollup.price_avg else None,
-                        price_min=float(rollup.price_min) if rollup.price_min else None,
-                        price_max=float(rollup.price_max) if rollup.price_max else None,
-                        bsr_avg=float(rollup.bsr_avg) if rollup.bsr_avg else None,
-                        rating_avg=float(rollup.rating_avg) if rollup.rating_avg else None
+            for summary in summaries:
+                # Use summary data to create rollup
+                if summary.asin not in rollup_map:
+                    rollup_map[summary.asin] = ProductRollup(
+                        as_of=summary.latest_metrics_date or date.today(),
+                        price_avg=float(summary.avg_price_30d) if summary.avg_price_30d else None,
+                        price_min=float(summary.min_price_30d) if summary.min_price_30d else None,
+                        price_max=float(summary.max_price_30d) if summary.max_price_30d else None,
+                        bsr_avg=float(summary.avg_bsr_30d) if summary.avg_bsr_30d else None,
+                        rating_avg=float(summary.latest_rating) if summary.latest_rating else None
                     )
             
             return [rollup_map.get(key[0]) for key in keys]
@@ -144,34 +138,72 @@ class ProductDeltaLoader(DataLoader):
             start_date = end_date - timedelta(days=30)  # Default to 30 days
             
             result = await self.db_session.execute(
-                select(ProductMetricsDeltaDaily)
+                select(ProductMetricsDaily)
                 .where(
                     and_(
-                        ProductMetricsDeltaDaily.asin.in_(asins),
-                        ProductMetricsDeltaDaily.date >= start_date,
-                        ProductMetricsDeltaDaily.date <= end_date
+                        ProductMetricsDaily.asin.in_(asins),
+                        ProductMetricsDaily.date >= start_date,
+                        ProductMetricsDaily.date <= end_date
                     )
                 )
-                .order_by(ProductMetricsDeltaDaily.asin, ProductMetricsDeltaDaily.date.desc())
+                .order_by(ProductMetricsDaily.asin, ProductMetricsDaily.date.desc())
             )
             
-            deltas = result.scalars().all()
+            metrics = result.scalars().all()
             
-            # Group deltas by ASIN
+            # Group metrics by ASIN and calculate deltas
             delta_map = {}
-            for delta in deltas:
-                if delta.asin not in delta_map:
-                    delta_map[delta.asin] = []
+            asin_metrics = {}
+            
+            # Group by ASIN first
+            for metric in metrics:
+                if metric.asin not in asin_metrics:
+                    asin_metrics[metric.asin] = []
+                asin_metrics[metric.asin].append(metric)
+            
+            # Calculate deltas for each ASIN
+            for asin, asin_metric_list in asin_metrics.items():
+                # Sort by date desc to get latest first
+                asin_metric_list.sort(key=lambda x: x.date, reverse=True)
+                delta_map[asin] = []
                 
-                delta_map[delta.asin].append(ProductDelta(
-                    date=delta.date,
-                    price_delta=float(delta.price_delta) if delta.price_delta else None,
-                    price_change_pct=float(delta.price_change_pct) if delta.price_change_pct else None,
-                    bsr_delta=delta.bsr_delta,
-                    bsr_change_pct=float(delta.bsr_change_pct) if delta.bsr_change_pct else None,
-                    rating_delta=float(delta.rating_delta) if delta.rating_delta else None,
-                    reviews_delta=delta.reviews_delta
-                ))
+                # Calculate day-over-day deltas
+                for i in range(len(asin_metric_list) - 1):
+                    current = asin_metric_list[i]
+                    previous = asin_metric_list[i + 1]
+                    
+                    # Calculate deltas
+                    price_delta = None
+                    price_change_pct = None
+                    if current.price and previous.price:
+                        price_delta = float(current.price - previous.price)
+                        if previous.price > 0:
+                            price_change_pct = round((price_delta / float(previous.price)) * 100, 2)
+                    
+                    bsr_delta = None
+                    bsr_change_pct = None
+                    if current.bsr and previous.bsr:
+                        bsr_delta = current.bsr - previous.bsr
+                        if previous.bsr > 0:
+                            bsr_change_pct = round((bsr_delta / previous.bsr) * 100, 2)
+                    
+                    rating_delta = None
+                    if current.rating and previous.rating:
+                        rating_delta = float(current.rating - previous.rating)
+                    
+                    reviews_delta = None
+                    if current.reviews_count and previous.reviews_count:
+                        reviews_delta = current.reviews_count - previous.reviews_count
+                    
+                    delta_map[asin].append(ProductDelta(
+                        date=current.date,
+                        price_delta=price_delta,
+                        price_change_pct=price_change_pct,
+                        bsr_delta=bsr_delta,
+                        bsr_change_pct=bsr_change_pct,
+                        rating_delta=rating_delta,
+                        reviews_delta=reviews_delta
+                    ))
             
             return [delta_map.get(key[0], []) for key in keys]
         except Exception as e:
