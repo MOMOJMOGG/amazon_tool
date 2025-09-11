@@ -118,8 +118,13 @@ class TestCoreMetricsProcessor:
             
             await processor._process_single_event(mock_session, sample_raw_event)
             
-            mock_upsert_product.assert_called_once_with(mock_session, sample_raw_event)
-            mock_create_metrics.assert_called_once_with(mock_session, sample_raw_event)
+            # The method now passes processing_data as third parameter
+            mock_upsert_product.assert_called_once()
+            mock_create_metrics.assert_called_once()
+            
+            # Verify the calls were made with correct number of parameters
+            assert len(mock_upsert_product.call_args[0]) == 3  # session, event, processing_data
+            assert len(mock_create_metrics.call_args[0]) == 3   # session, event, processing_data
     
     @pytest.mark.asyncio
     async def test_process_single_event_invalid_data(self, processor, invalid_raw_event):

@@ -20,8 +20,8 @@ router = APIRouter(prefix="/v1/products", tags=["products"])
 
 async def fetch_product_with_metrics(asin: str) -> Optional[ProductWithMetrics]:
     """Fetch product with latest metrics from database."""
-    async for db in get_db():
-        try:
+    try:
+        async for db in get_db():
             # Query product with latest metrics
             product_query = select(Product).where(Product.asin == asin)
             result = await db.execute(product_query)
@@ -57,11 +57,9 @@ async def fetch_product_with_metrics(asin: str) -> Optional[ProductWithMetrics]:
             
             return ProductWithMetrics(**product_data)
             
-        except Exception as e:
-            logger.error(f"Error fetching product {asin}: {e}")
-            raise
-        finally:
-            break  # Exit the async generator
+    except Exception as e:
+        logger.error(f"Error fetching product {asin}: {e}")
+        raise
 
 
 @router.get("/{asin}", response_model=ProductResponse)
@@ -99,6 +97,10 @@ async def get_product(asin: str) -> ProductResponse:
             ttl_seconds=86400,  # 24 hours
             stale_seconds=3600,  # 1 hour
         )
+        
+        # Handle case where cache returns None
+        if data is None:
+            raise HTTPException(status_code=404, detail="Product not found")
         
         # Convert back to Pydantic model
         product_data = ProductWithMetrics(**data)
