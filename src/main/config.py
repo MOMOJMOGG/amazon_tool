@@ -15,7 +15,8 @@ class Settings(BaseSettings):
     
     model_config = SettingsConfigDict(
         env_file=".env",
-        case_sensitive=False
+        case_sensitive=False,
+        extra="ignore"  # Ignore extra fields instead of raising errors
     )
     
     # Database Configuration
@@ -48,6 +49,16 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     openai_model: str = "gpt-4"
     openai_max_tokens: int = 2000
+    
+    # Apify Configuration
+    apify_api_key: Optional[str] = None
+    
+    # Docker Configuration (optional - used by docker-compose)
+    postgres_db: Optional[str] = None
+    postgres_user: Optional[str] = None
+    postgres_password: Optional[str] = None
+    grafana_password: Optional[str] = None
+    dev_database_url: Optional[str] = None
 
 
 # Global settings instance
