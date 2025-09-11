@@ -18,6 +18,10 @@ class TestRealDataAPIs:
     @pytest.mark.asyncio
     async def test_health_endpoint_real_connections(self):
         """Test health endpoint with real database/Redis connections."""
+        # Initialize database for this test
+        from src.main.database import init_db
+        await init_db()
+        
         async with AsyncClient(app=app, base_url="http://test") as ac:
             response = await ac.get("/health")
             
@@ -31,6 +35,10 @@ class TestRealDataAPIs:
     @pytest.mark.asyncio
     async def test_get_real_product_success(self):
         """Test getting a real product from loaded data."""
+        # Initialize database for this test
+        from src.main.database import init_db
+        await init_db()
+        
         async with AsyncClient(app=app, base_url="http://test") as ac:
             # Disable cache for this test to ensure we hit the database
             with patch('src.main.services.cache.cache.get_or_set') as mock_cache:
@@ -55,17 +63,21 @@ class TestRealDataAPIs:
                 assert product["asin"] == self.REAL_MAIN_ASIN
                 assert "title" in product
                 assert "brand" in product
-                assert "price" in product
-                assert "rating" in product
+                assert "latest_price" in product
+                assert "latest_rating" in product
                 
                 # Validate real data values (from our Apify load)
                 assert "Wireless Earbuds" in product["title"]
-                assert product["price"] == 25.99
-                assert product["rating"] == 5.0
+                assert product["latest_price"] == 25.99
+                assert product["latest_rating"] == 5.0
     
     @pytest.mark.asyncio
     async def test_get_real_product_not_found(self):
         """Test getting a product not in our dataset."""
+        # Initialize database for this test
+        from src.main.database import init_db
+        await init_db()
+        
         async with AsyncClient(app=app, base_url="http://test") as ac:
             response = await ac.get(f"/v1/products/{self.INVALID_ASIN}")
             
@@ -76,6 +88,10 @@ class TestRealDataAPIs:
     @pytest.mark.asyncio 
     async def test_competition_setup_endpoint(self):
         """Test competition setup API with real ASINs."""
+        # Initialize database for this test
+        from src.main.database import init_db
+        await init_db()
+        
         async with AsyncClient(app=app, base_url="http://test") as ac:
             # Test getting competitor links (should exist from our setup)
             response = await ac.get(f"/v1/competitions/links/{self.REAL_MAIN_ASIN}")
@@ -91,6 +107,10 @@ class TestRealDataAPIs:
     @pytest.mark.asyncio
     async def test_competition_data_endpoint(self):
         """Test competition data API with real relationships."""
+        # Initialize database for this test
+        from src.main.database import init_db
+        await init_db()
+        
         async with AsyncClient(app=app, base_url="http://test") as ac:
             response = await ac.get(f"/v1/competitions/{self.REAL_MAIN_ASIN}?days_back=30")
             
@@ -106,6 +126,10 @@ class TestRealDataAPIs:
     @pytest.mark.asyncio
     async def test_metrics_endpoint_real(self):
         """Test metrics endpoint returns real usage data."""
+        # Initialize database for this test
+        from src.main.database import init_db
+        await init_db()
+        
         async with AsyncClient(app=app, base_url="http://test") as ac:
             response = await ac.get("/metrics")
             
@@ -119,6 +143,10 @@ class TestRealDataAPIs:
     @pytest.mark.asyncio
     async def test_etl_job_status_with_real_jobs(self):
         """Test ETL job status API shows real job executions."""
+        # Initialize database for this test
+        from src.main.database import init_db
+        await init_db()
+        
         async with AsyncClient(app=app, base_url="http://test") as ac:
             response = await ac.get("/v1/etl/jobs")
             
@@ -135,6 +163,10 @@ class TestRealDataAPIs:
     @pytest.mark.asyncio
     async def test_multiple_real_products(self):
         """Test multiple real products to validate dataset."""
+        # Initialize database for this test
+        from src.main.database import init_db
+        await init_db()
+        
         real_asins = [
             "B0FDKB341G",  # Main product
             "B09JVCL7JR",  # Another main product
@@ -144,7 +176,11 @@ class TestRealDataAPIs:
         async with AsyncClient(app=app, base_url="http://test") as ac:
             for asin in real_asins:
                 with patch('src.main.services.cache.cache.get_or_set') as mock_cache:
-                    mock_cache.return_value = (None, False, None)
+                    # Mock cache miss - but let it call the actual fetch function
+                    async def side_effect(key, fetch_func, **kwargs):
+                        data = await fetch_func()
+                        return (data, False, None)  # Return actual data, not cached
+                    mock_cache.side_effect = side_effect
                     
                     response = await ac.get(f"/v1/products/{asin}")
                     
@@ -155,5 +191,5 @@ class TestRealDataAPIs:
                     
                     assert product["asin"] == asin
                     assert product["title"] is not None
-                    assert product["price"] is not None
-                    assert product["rating"] is not None
+                    assert product["latest_price"] is not None
+                    assert product["latest_rating"] is not None

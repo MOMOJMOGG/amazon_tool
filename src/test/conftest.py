@@ -59,26 +59,9 @@ def mock_db():
     return mock
 
 
-@pytest.fixture(scope="session", autouse=True)
-def setup_test_environment():
-    """Setup test environment once per session."""
-    import asyncio
-    from src.main.database import init_db
-    
-    # Initialize database synchronously for the test session
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(init_db())
-    finally:
-        loop.close()
-    
-    return True
-
-
 @pytest.fixture
 async def test_client():
-    """Test client for FastAPI app with database already initialized."""
+    """Test client for FastAPI app."""
     async with AsyncClient(app=app, base_url="http://test") as ac:
         yield ac
 
