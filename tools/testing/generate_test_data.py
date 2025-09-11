@@ -80,7 +80,7 @@ class TestDataGenerator:
             },
             {
                 "asin": "B0794W1SKP", 
-                "title": "Echo Dot (3rd Gen) | Smart speaker",
+                "title": "Soundcore by Anker, Space One (Alternative Model)",
                 "brand": "Amazon",
                 "category": "Electronics",
                 "base_price": 39.99,

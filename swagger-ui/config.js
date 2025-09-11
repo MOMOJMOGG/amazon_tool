@@ -55,9 +55,9 @@ const DEMO_REQUESTS = {
     sampleResponse: {
       "products": [
         {
-          "id": "B08N5WRWNW",
-          "name": "Echo Dot (4th Gen)",
-          "current_price": 49.99,
+          "id": "B0C6KKQ7ND",
+          "name": "Soundcore by Anker, Space One, Active Noise Cancelling Headphones",
+          "current_price": 99.99,
           "last_updated": "2025-01-10T10:00:00Z"
         }
       ]

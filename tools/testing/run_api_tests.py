@@ -143,7 +143,7 @@ class APITester:
                 "event_type": "product_update",
                 "raw_data": {
                     "asin": "RealTestData.PRIMARY_TEST_ASIN",
-                    "title": "Echo Dot (4th Gen) API Test",
+                    "title": "Soundcore by Anker, Space One, Active Noise Cancelling Headphones API Test",
                     "brand": "Amazon",
                     "price": 49.99,
                     "bsr": 1000,

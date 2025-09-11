@@ -81,7 +81,7 @@ cp .env.example .env
 3. **Demo Competition Data**:
    ```bash
    # Get competition analysis for a product
-   curl "http://localhost:8000/v1/competitions/B08N5WRWNW" | jq
+   curl "http://localhost:8000/v1/competitions/B0C6KKQ7ND" | jq
    
    # Get all competitors
    curl "http://localhost:8000/v1/products" | jq '.products[] | {name, current_price, competitors}'
@@ -110,19 +110,19 @@ cp .env.example .env
 1. **Generate Competition Report**:
    ```bash
    # Get AI-generated competition analysis
-   curl "http://localhost:8000/v1/competitions/B08N5WRWNW/report" | jq
+   curl "http://localhost:8000/v1/competitions/B0C6KKQ7ND/report" | jq
    ```
 
 2. **View in Swagger UI**:
    - Open http://localhost:8000/docs
    - Find "Competition Analysis" section
    - Try the `/v1/competitions/{asin}/report` endpoint
-   - Use ASIN: `B08N5WRWNW` for demo data
+   - Use ASIN: `B0C6KKQ7ND` for demo data
 
 3. **Background Processing Demo** (if Celery is running):
    ```bash
    # Trigger background task
-   curl -X POST "http://localhost:8000/v1/competitions/B08N5WRWNW/refresh"
+   curl -X POST "http://localhost:8000/v1/competitions/B0C6KKQ7ND/refresh"
    
    # Check task status
    curl "http://localhost:8000/v1/jobs/{job_id}"
@@ -180,10 +180,10 @@ curl http://localhost:8000/health
 curl "http://localhost:8000/v1/products" | jq '.products[0]'
 
 # 3. Get competition analysis
-curl "http://localhost:8000/v1/competitions/B08N5WRWNW" | jq
+curl "http://localhost:8000/v1/competitions/B0C6KKQ7ND" | jq
 
 # 4. Generate LLM report
-curl "http://localhost:8000/v1/competitions/B08N5WRWNW/report" | jq '.report'
+curl "http://localhost:8000/v1/competitions/B0C6KKQ7ND/report" | jq '.report'
 
 # 5. GraphQL query (paste in GraphQL playground)
 ```

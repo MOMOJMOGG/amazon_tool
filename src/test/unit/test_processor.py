@@ -152,7 +152,7 @@ class TestCoreMetricsProcessor:
         # Verify the added product has correct attributes
         added_product = mock_session.add.call_args[0][0]
         assert added_product.asin == RealTestData.PRIMARY_TEST_ASIN
-        assert added_product.title == "Echo Dot (4th Gen)"
+        assert added_product.title == RealTestData.PRIMARY_PRODUCT_TITLE
     
     @pytest.mark.asyncio
     async def test_upsert_product_existing_product(self, processor, sample_raw_event):
