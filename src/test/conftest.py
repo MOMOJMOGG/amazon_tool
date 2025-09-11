@@ -70,15 +70,15 @@ async def test_client():
 def sample_product_data():
     """Sample product data for testing."""
     return {
-        "asin": "B08N5WRWNW",
-        "title": "Echo Dot (4th Gen) | Smart speaker with Alexa",
-        "brand": "Amazon",
-        "category": "Electronics",
-        "image_url": "https://example.com/image.jpg",
-        "latest_price": 49.99,
+        "asin": "B0B8YNRS6D",
+        "title": "BERIBES Bluetooth Headphones Over Ear, 65H Playtime and 6 EQ Music Modes Wireless Heaphones with Microphone, HiFi Stereo Foldable Lightweight Headset (White)",
+        "brand": "BERIBES",
+        "category": "Over-Ear Headphones",
+        "image_url": "https://m.media-amazon.com/images/I/61bnUaDGWPL._AC_SL1500_.jpg",
+        "latest_price": 21.99,
         "latest_bsr": 1,
         "latest_rating": 4.5,
-        "latest_reviews_count": 1000,
-        "latest_buybox_price": 49.99,
-        "last_updated": "2023-01-01T00:00:00",
+        "latest_reviews_count": 44446,
+        "latest_buybox_price": 21.99,
+        "last_updated": "2025-09-11T03:49:15",
     }

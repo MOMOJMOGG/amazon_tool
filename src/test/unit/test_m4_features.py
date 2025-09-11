@@ -9,6 +9,7 @@ from src.main.models.product import BatchProductRequest, BatchProductResponse
 from src.main.utils.etag import generate_etag, check_if_none_match, ETagData
 from src.main.middleware.rate_limit import RateLimiter, RateLimitRule
 from src.main.services.cache import CacheService
+from src.test.fixtures.real_test_data import RealTestData, get_test_asin
 
 
 class TestBatchProductModels:
@@ -17,19 +18,19 @@ class TestBatchProductModels:
     def test_batch_product_request_validation(self):
         """Test batch request validation."""
         # Valid request
-        request = BatchProductRequest(asins=["B0FDKB341G", "B0F6BJSTSQ"])
+        request = BatchProductRequest(asins=[RealTestData.PRIMARY_TEST_ASIN, RealTestData.ALTERNATIVE_TEST_ASINS[0]])
         assert len(request.asins) == 2
         assert all(len(asin) == 10 for asin in request.asins)
     
     def test_batch_product_request_asin_normalization(self):
         """Test ASIN normalization in batch request."""
-        request = BatchProductRequest(asins=[" b0fdkb341g ", "B0F6BJSTSQ"])
-        assert request.asins == ["B0FDKB341G", "B0F6BJSTSQ"]
+        request = BatchProductRequest(asins=[f" {RealTestData.PRIMARY_TEST_ASIN.lower()} ", RealTestData.ALTERNATIVE_TEST_ASINS[0]])
+        assert request.asins == [RealTestData.PRIMARY_TEST_ASIN, RealTestData.ALTERNATIVE_TEST_ASINS[0]]
     
     def test_batch_product_request_invalid_asin(self):
         """Test validation of invalid ASINs."""
         with pytest.raises(ValueError):
-            BatchProductRequest(asins=["INVALID", "B0F6BJSTSQ"])
+            BatchProductRequest(asins=["INVALID", RealTestData.ALTERNATIVE_TEST_ASINS[0]])
     
     def test_batch_product_request_too_many_asins(self):
         """Test limit on number of ASINs."""
@@ -56,7 +57,7 @@ class TestETagUtilities:
     
     def test_generate_etag_consistency(self):
         """Test ETag generation is consistent for same data."""
-        data = {"asin": "B0FDKB341G", "title": "Test Product"}
+        data = {"asin": RealTestData.PRIMARY_TEST_ASIN, "title": RealTestData.PRIMARY_PRODUCT_TITLE}
         etag1 = generate_etag(data)
         etag2 = generate_etag(data)
         assert etag1 == etag2
@@ -64,8 +65,8 @@ class TestETagUtilities:
     
     def test_generate_etag_different_data(self):
         """Test ETag is different for different data."""
-        data1 = {"asin": "B0FDKB341G", "title": "Product 1"}
-        data2 = {"asin": "B0FDKB341G", "title": "Product 2"}
+        data1 = {"asin": RealTestData.PRIMARY_TEST_ASIN, "title": "Product 1"}
+        data2 = {"asin": RealTestData.PRIMARY_TEST_ASIN, "title": "Product 2"}
         etag1 = generate_etag(data1)
         etag2 = generate_etag(data2)
         assert etag1 != etag2
@@ -262,12 +263,12 @@ class TestCacheInvalidation:
         with patch.object(cache_service, 'publish_invalidation') as mock_publish:
             mock_publish.return_value = True
             
-            result = await cache_service.invalidate_product_cache("B0FDKB341G")
+            result = await cache_service.invalidate_product_cache(RealTestData.PRIMARY_TEST_ASIN)
             
             assert result is True
             mock_publish.assert_called_once_with(
-                "product:B0FDKB341G:*", 
-                "product_update:B0FDKB341G"
+                f"product:{RealTestData.PRIMARY_TEST_ASIN}:*", 
+                f"product_update:{RealTestData.PRIMARY_TEST_ASIN}"
             )
     
     @pytest.mark.asyncio
@@ -276,12 +277,12 @@ class TestCacheInvalidation:
         with patch.object(cache_service, 'publish_invalidation') as mock_publish:
             mock_publish.return_value = True
             
-            result = await cache_service.invalidate_competition_cache("B0FDKB341G")
+            result = await cache_service.invalidate_competition_cache(RealTestData.PRIMARY_TEST_ASIN)
             
             assert result is True
             mock_publish.assert_called_once_with(
-                "competition:B0FDKB341G:*",
-                "competition_update:B0FDKB341G"
+                f"competition:{RealTestData.PRIMARY_TEST_ASIN}:*",
+                f"competition_update:{RealTestData.PRIMARY_TEST_ASIN}"
             )
     
     def test_invalidation_listeners(self, cache_service):

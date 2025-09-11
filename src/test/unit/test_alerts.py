@@ -35,8 +35,8 @@ class TestAlertService:
             
             # Mock current metrics query
             mock_current = MagicMock()
-            mock_current.asin = "B08N5WRWNW"
-            mock_current.current_price = 59.99
+            mock_current.asin = "B0B8YNRS6D"
+            mock_current.current_price = 21.99
             mock_current.current_bsr = 1500
             
             mock_result = AsyncMock()

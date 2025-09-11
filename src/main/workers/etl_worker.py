@@ -30,16 +30,16 @@ class ETLWorker:
         
         # Sample ASINs for testing
         sample_asins = [
-            "B08N5WRWNW",  # Echo Dot
-            "B07XJ8C8F5",  # Fire TV Stick
-            "B084DWCZRQ",  # Echo Show 5
-            "B07HZLHPKP",  # Fire TV Cube
-            "B08MQLDKS6",  # Echo Auto
-            "B0794W1SKP",  # Echo Dot 3rd Gen
-            "B07B8W5LCW",  # Echo Input
-            "B07PRDSREZ",  # Echo Show 8
-            "B077SXWDXS",  # Echo Show
-            "B06ZXWSJDS"   # Echo Spot
+            "B09JVCL7JR",
+            "B09JVG3TWX",
+            "B0B8YNRS6D",
+            "B0C6KKQ7ND",
+            "B0CG2Z78TL",
+            "B0CHYJT52D",
+            "B0CS8WVRLQ",
+            "B0D1QR8NL8",
+            "B0DH2BYN2Z",
+            "B0F6BJSTSQ"
         ]
         
         events_ingested = 0

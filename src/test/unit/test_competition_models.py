@@ -13,6 +13,7 @@ from src.main.models.competition import (
     CompetitorLinkRequest,
     CompetitorLinkResponse
 )
+from src.test.fixtures.real_test_data import RealTestData, get_test_asin
 
 
 class TestCompetitorLink:
@@ -21,13 +22,13 @@ class TestCompetitorLink:
     def test_competitor_link_creation(self):
         """Test creating a competitor link instance."""
         link = CompetitorLink(
-            asin_main="B0FDKB341G",
-            asin_comp="B0F6BJSTSQ",
+            asin_main=RealTestData.PRIMARY_TEST_ASIN,
+            asin_comp=RealTestData.ALTERNATIVE_TEST_ASINS[0],
             created_at=datetime.now()
         )
         
-        assert link.asin_main == "B0FDKB341G"
-        assert link.asin_comp == "B0F6BJSTSQ"
+        assert link.asin_main == RealTestData.PRIMARY_TEST_ASIN
+        assert link.asin_comp == RealTestData.ALTERNATIVE_TEST_ASINS[0]
         assert isinstance(link.created_at, datetime)
         assert link.__tablename__ == "competitor_links"
         assert link.__table_args__["schema"] == "core"
@@ -35,14 +36,14 @@ class TestCompetitorLink:
     def test_competitor_link_repr(self):
         """Test string representation of competitor link."""
         link = CompetitorLink(
-            asin_main="B0FDKB341G",
-            asin_comp="B0F6BJSTSQ"
+            asin_main=RealTestData.PRIMARY_TEST_ASIN,
+            asin_comp=RealTestData.ALTERNATIVE_TEST_ASINS[0]
         )
         
         repr_str = repr(link)
         assert "CompetitorLink" in repr_str
-        assert "B0FDKB341G" in repr_str
-        assert "B0F6BJSTSQ" in repr_str
+        assert RealTestData.PRIMARY_TEST_ASIN in repr_str
+        assert RealTestData.ALTERNATIVE_TEST_ASINS[0] in repr_str
 
 
 class TestCompetitorComparisonDaily:
@@ -51,8 +52,8 @@ class TestCompetitorComparisonDaily:
     def test_comparison_daily_creation(self):
         """Test creating a daily comparison instance."""
         comparison = CompetitorComparisonDaily(
-            asin_main="B0FDKB341G",
-            asin_comp="B0F6BJSTSQ",
+            asin_main=RealTestData.PRIMARY_TEST_ASIN,
+            asin_comp=RealTestData.ALTERNATIVE_TEST_ASINS[0],
             date=date.today(),
             price_diff=-10.0,  # Competitor is $10 more expensive
             bsr_gap=500,       # Main product has better BSR by 500 ranks
@@ -62,8 +63,8 @@ class TestCompetitorComparisonDaily:
             extras={"notes": "test comparison"}
         )
         
-        assert comparison.asin_main == "B0FDKB341G"
-        assert comparison.asin_comp == "B0F6BJSTSQ"
+        assert comparison.asin_main == RealTestData.PRIMARY_TEST_ASIN
+        assert comparison.asin_comp == RealTestData.ALTERNATIVE_TEST_ASINS[0]
         assert isinstance(comparison.date, date)
         assert comparison.price_diff == -10.0
         assert comparison.bsr_gap == 500
@@ -74,23 +75,23 @@ class TestCompetitorComparisonDaily:
     def test_comparison_daily_repr(self):
         """Test string representation of daily comparison."""
         comparison = CompetitorComparisonDaily(
-            asin_main="B0FDKB341G",
-            asin_comp="B0F6BJSTSQ",
+            asin_main=RealTestData.PRIMARY_TEST_ASIN,
+            asin_comp=RealTestData.ALTERNATIVE_TEST_ASINS[0],
             date=date.today()
         )
         
         repr_str = repr(comparison)
         assert "CompetitorComparisonDaily" in repr_str
-        assert "B0FDKB341G" in repr_str
-        assert "B0F6BJSTSQ" in repr_str
+        assert RealTestData.PRIMARY_TEST_ASIN in repr_str
+        assert RealTestData.ALTERNATIVE_TEST_ASINS[0] in repr_str
 
 
 class TestCompetitionResponseModels:
     """Test Pydantic response models for competition API."""
     
     # Real ASINs from our loaded dataset for testing
-    REAL_MAIN_ASIN = "B0FDKB341G"
-    REAL_COMP_ASIN = "B0F6BJSTSQ"
+    REAL_MAIN_ASIN = RealTestData.PRIMARY_TEST_ASIN
+    REAL_COMP_ASIN = RealTestData.ALTERNATIVE_TEST_ASINS[0]
     
     def test_competition_data_valid(self):
         """Test CompetitionData with valid peer gap data."""
@@ -189,19 +190,19 @@ class TestCompetitionValidation:
     def test_asin_format_validation(self):
         """Test ASIN format validation in models."""
         # Valid ASINs from our real data
-        valid_asins = ["B0FDKB341G", "B0F6BJSTSQ", "B09JVCL7JR"]
+        valid_asins = [RealTestData.PRIMARY_TEST_ASIN, RealTestData.ALTERNATIVE_TEST_ASINS[0], RealTestData.ALTERNATIVE_TEST_ASINS[1]]
         
         for asin in valid_asins:
             # Should not raise validation error
             link_request = CompetitorLinkRequest(
                 asin_main=asin,
-                competitor_asins=["B0F6BJSTSQ"]
+                competitor_asins=[RealTestData.ALTERNATIVE_TEST_ASINS[0]]
             )
             assert link_request.asin_main == asin
     
     def test_competitor_asin_limits(self):
         """Test competitor ASIN list validation."""
-        main_asin = "B0FDKB341G"
+        main_asin = RealTestData.PRIMARY_TEST_ASIN
         
         # Valid: 1 competitor
         request1 = CompetitorLinkRequest(
@@ -221,14 +222,14 @@ class TestCompetitionValidation:
     def test_peer_gap_optional_fields(self):
         """Test PeerGap model with optional fields."""
         # Only ASIN is required, others are optional
-        peer_gap = PeerGap(asin="B0F6BJSTSQ")
-        assert peer_gap.asin == "B0F6BJSTSQ"
+        peer_gap = PeerGap(asin=RealTestData.ALTERNATIVE_TEST_ASINS[0])
+        assert peer_gap.asin == RealTestData.ALTERNATIVE_TEST_ASINS[0]
         assert peer_gap.price_diff is None
         assert peer_gap.bsr_gap is None
         
         # With some fields populated
         peer_gap2 = PeerGap(
-            asin="B0F6BJSTSQ",
+            asin=RealTestData.ALTERNATIVE_TEST_ASINS[0],
             price_diff=-10.0,
             rating_diff=0.5
         )
@@ -240,8 +241,8 @@ class TestRealDataIntegration:
     """Integration tests using real loaded data."""
     
     # Use real ASINs from our Apify dataset
-    REAL_MAIN_ASIN = "B0FDKB341G"  # Wireless earbuds
-    REAL_COMP_ASIN = "B0F6BJSTSQ"  # Competitor
+    REAL_MAIN_ASIN = RealTestData.PRIMARY_TEST_ASIN  # Soundcore headphones
+    REAL_COMP_ASIN = RealTestData.ALTERNATIVE_TEST_ASINS[0]  # Competitor
     
     def test_model_with_real_asin_data(self):
         """Test models work with our real ASIN data."""

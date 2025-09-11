@@ -12,6 +12,7 @@ from src.main.graphql.dataloaders import (
 )
 from src.main.services.reports import ReportGenerationService, CompetitionEvidence
 from src.main.graphql.schema import validate_persisted_query
+from src.test.fixtures.real_test_data import RealTestData, get_test_asin
 
 
 class TestGraphQLTypes:
@@ -26,14 +27,14 @@ class TestGraphQLTypes:
     def test_product_type_creation(self):
         """Test Product type can be created."""
         product = Product(
-            asin="B0FDKB341G",
-            title="Test Product",
-            brand="Test Brand"
+            asin=RealTestData.PRIMARY_TEST_ASIN,
+            title=RealTestData.PRIMARY_PRODUCT_TITLE,
+            brand=RealTestData.PRIMARY_PRODUCT_BRAND
         )
         
-        assert product.asin == "B0FDKB341G"
-        assert product.title == "Test Product"
-        assert product.brand == "Test Brand"
+        assert product.asin == RealTestData.PRIMARY_TEST_ASIN
+        assert product.title == RealTestData.PRIMARY_PRODUCT_TITLE
+        assert product.brand == RealTestData.PRIMARY_PRODUCT_BRAND
     
     def test_product_metrics_type(self):
         """Test ProductMetrics type."""
@@ -56,22 +57,22 @@ class TestGraphQLTypes:
         from src.main.graphql.types import PeerGap
         
         peer = PeerGap(
-            asin="B0F6BJSTSQ",
+            asin=RealTestData.ALTERNATIVE_TEST_ASINS[0],
             price_diff=5.00,
             bsr_gap=-2000,
             rating_diff=0.2
         )
         
         competition = Competition(
-            asin_main="B0FDKB341G",
+            asin_main=RealTestData.PRIMARY_TEST_ASIN,
             range=Range.D30,
             peers=[peer]
         )
         
-        assert competition.asin_main == "B0FDKB341G"
+        assert competition.asin_main == RealTestData.PRIMARY_TEST_ASIN
         assert competition.range == Range.D30
         assert len(competition.peers) == 1
-        assert competition.peers[0].asin == "B0F6BJSTSQ"
+        assert competition.peers[0].asin == RealTestData.ALTERNATIVE_TEST_ASINS[0]
 
 
 class TestDataLoaders:
@@ -92,7 +93,7 @@ class TestDataLoaders:
         loader = ProductLoader()
         
         # Test with known ASINs that should exist in Supabase
-        test_asins = ["B0FDKB341G", "B0F6BJSTSQ", "NONEXISTENT"]
+        test_asins = [RealTestData.PRIMARY_TEST_ASIN, RealTestData.ALTERNATIVE_TEST_ASINS[0], "NONEXISTENT"]
         results = await loader.batch_load_fn(test_asins)
         
         assert len(results) == 3
@@ -116,7 +117,7 @@ class TestDataLoaders:
         loader = ProductMetricsLoader()
         
         # Test with known ASIN
-        results = await loader.batch_load_fn(["B0FDKB341G"])
+        results = await loader.batch_load_fn([RealTestData.PRIMARY_TEST_ASIN])
         
         assert len(results) == 1
         # Result may be None if no metrics exist in Supabase, which is acceptable
@@ -138,7 +139,7 @@ class TestDataLoaders:
         loader = CompetitionLoader()
         
         # Test loading competition data
-        key = ("B0FDKB341G", ["B0F6BJSTSQ"], Range.D30)
+        key = (RealTestData.PRIMARY_TEST_ASIN, [RealTestData.ALTERNATIVE_TEST_ASINS[0]], Range.D30)
         results = await loader.batch_load_fn([key])
         
         assert len(results) == 1
@@ -161,7 +162,7 @@ class TestDataLoaders:
         
         loader = ReportLoader()
         
-        results = await loader.batch_load_fn(["B0FDKB341G"])
+        results = await loader.batch_load_fn([RealTestData.PRIMARY_TEST_ASIN])
         
         assert len(results) == 1
         # Result may be None if no reports exist in Supabase, which is acceptable
@@ -172,7 +173,7 @@ class TestDataLoaders:
             assert "summary" in results[0]
             assert "model" in results[0]
             assert "generated_at" in results[0]
-            assert results[0]["asin_main"] == "B0FDKB341G"
+            assert results[0]["asin_main"] == RealTestData.PRIMARY_TEST_ASIN
 
 
 class TestReportGeneration:
@@ -187,12 +188,12 @@ class TestReportGeneration:
     def mock_evidence(self):
         """Create mock evidence data."""
         return CompetitionEvidence(
-            main_asin="B0FDKB341G",
+            main_asin=RealTestData.PRIMARY_TEST_ASIN,
             main_product_data={
                 'product_info': {
-                    'asin': 'B0FDKB341G',
-                    'title': 'Test Product',
-                    'brand': 'Test Brand'
+                    'asin': RealTestData.PRIMARY_TEST_ASIN,
+                    'title': RealTestData.PRIMARY_PRODUCT_TITLE,
+                    'brand': RealTestData.PRIMARY_PRODUCT_BRAND
                 },
                 'metrics': {
                     'current_price': 29.99,
@@ -203,7 +204,7 @@ class TestReportGeneration:
             },
             competitor_data=[
                 {
-                    'asin': 'B0F6BJSTSQ',
+                    'asin': RealTestData.ALTERNATIVE_TEST_ASINS[0],
                     'price_diff': 5.00,
                     'bsr_gap': -1000,
                     'rating_diff': 0.2
@@ -240,24 +241,24 @@ class TestReportGeneration:
         """Test OpenAI prompt building."""
         prompt = report_service._build_report_prompt(mock_evidence)
         
-        assert "B0FDKB341G" in prompt
-        assert "Test Product" in prompt
+        assert RealTestData.PRIMARY_TEST_ASIN in prompt
+        assert RealTestData.PRIMARY_PRODUCT_TITLE in prompt
         assert "29.99" in prompt
-        assert "B0F6BJSTSQ" in prompt
+        assert RealTestData.ALTERNATIVE_TEST_ASINS[0] in prompt
         assert "executive_summary" in prompt
         assert "JSON" in prompt
     
     def test_format_competitor_data(self, report_service):
         """Test competitor data formatting for prompt."""
         competitor_data = [
-            {'asin': 'B0F6BJSTSQ', 'price_diff': 5.0, 'bsr_gap': -1000},
-            {'asin': 'B09JVCL7JR', 'price_diff': -2.5, 'bsr_gap': 500}
+            {'asin': RealTestData.ALTERNATIVE_TEST_ASINS[0], 'price_diff': 5.0, 'bsr_gap': -1000},
+            {'asin': RealTestData.ALTERNATIVE_TEST_ASINS[1], 'price_diff': -2.5, 'bsr_gap': 500}
         ]
         
         formatted = report_service._format_competitor_data(competitor_data)
         
-        assert "B0F6BJSTSQ" in formatted
-        assert "B09JVCL7JR" in formatted
+        assert RealTestData.ALTERNATIVE_TEST_ASINS[0] in formatted
+        assert RealTestData.ALTERNATIVE_TEST_ASINS[1] in formatted
         assert "5.0" in formatted
         assert "-1000" in formatted
     
@@ -272,7 +273,7 @@ class TestReportGeneration:
     async def test_generate_report_with_real_data_mock_api(self, report_service):
         """Test report generation with real Supabase data and mocked OpenAI API."""
         # Get real evidence data from Supabase
-        evidence = await report_service.get_evidence_data("B0FDKB341G", 30)
+        evidence = await report_service.get_evidence_data(RealTestData.PRIMARY_TEST_ASIN, 30)
         
         if evidence is None:
             # Skip test if no real data available
@@ -305,7 +306,7 @@ class TestReportGeneration:
                 result = await report_service._generate_llm_report(evidence)
                 
                 assert result is not None
-                assert result.asin_main == "B0FDKB341G"
+                assert result.asin_main == RealTestData.PRIMARY_TEST_ASIN
                 assert result.executive_summary == "Test product maintains competitive position"
                 assert result.model_used == "gpt-4"
 
@@ -365,7 +366,7 @@ class TestGraphQLCacheIntegration:
         loader = ProductLoader()
         
         # Load multiple products - should result in efficient batch loading
-        results = await loader.batch_load_fn(["B0FDKB341G", "B0F6BJSTSQ"])
+        results = await loader.batch_load_fn([RealTestData.PRIMARY_TEST_ASIN, RealTestData.ALTERNATIVE_TEST_ASINS[0]])
         
         # Verify we get results (may be None if no data exists, which is acceptable)
         assert len(results) == 2
@@ -405,7 +406,7 @@ class TestGraphQLErrorHandling:
     def test_competition_evidence_validation(self):
         """Test CompetitionEvidence data validation."""
         evidence = CompetitionEvidence(
-            main_asin="B0FDKB341G",
+            main_asin=RealTestData.PRIMARY_TEST_ASIN,
             main_product_data={},
             competitor_data=[],
             market_analysis={},
@@ -413,7 +414,7 @@ class TestGraphQLErrorHandling:
             data_completeness=0.5
         )
         
-        assert evidence.main_asin == "B0FDKB341G"
+        assert evidence.main_asin == RealTestData.PRIMARY_TEST_ASIN
         assert evidence.time_range_days == 30
         assert 0.0 <= evidence.data_completeness <= 1.0
 
