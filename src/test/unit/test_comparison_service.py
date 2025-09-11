@@ -21,8 +21,8 @@ class TestCompetitorComparisonService:
     
     @pytest.fixture
     def real_competitor_asins(self):
-        # Real competitor ASINs that actually exist in our loaded database
-        return ["B0F6BJSTSQ", "B09JVCL7JR", "B0FDK6TTSG", "B0FDK6L4K6", "B0FDK6VYGX"]
+        # Real competitor ASINs from config file (marked as 'comp' not 'main')
+        return ["B0F6BJSTSQ", "B0CHYJT52D", "B0F9DM91VJ", "B0CG2Z78TL", "B0C6KKQ7ND"]
     
     @pytest.fixture
     def mock_competitor_asins(self):

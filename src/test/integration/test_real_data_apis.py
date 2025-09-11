@@ -93,7 +93,19 @@ class TestRealDataAPIs:
         await init_db()
         
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            # Test getting competitor links (should exist from our setup)
+            # Clean up any existing competitor links first to ensure clean state
+            await ac.delete(f"/v1/competitions/links/{self.REAL_MAIN_ASIN}")
+            
+            # Set up exactly 5 legitimate competitors from config file
+            legitimate_competitors = ["B0F6BJSTSQ", "B0CHYJT52D", "B0F9DM91VJ", "B0CG2Z78TL", "B0C6KKQ7ND"]
+            
+            setup_response = await ac.post("/v1/competitions/setup", json={
+                "asin_main": self.REAL_MAIN_ASIN,
+                "competitor_asins": legitimate_competitors
+            })
+            assert setup_response.status_code == 200
+            
+            # Now test getting competitor links
             response = await ac.get(f"/v1/competitions/links/{self.REAL_MAIN_ASIN}")
             
             assert response.status_code == 200
