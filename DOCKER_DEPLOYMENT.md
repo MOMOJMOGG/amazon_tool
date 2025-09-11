@@ -9,10 +9,10 @@ This guide provides step-by-step instructions to deploy the Amazon Product Monit
 # 1. One-command deployment
 docker-compose -f docker-compose.simple.yml up -d
 
-# 2. Access your application
-# API Documentation: http://localhost/docs
-# Health Check: http://localhost/health
-# API Endpoints: http://localhost/v1/
+# 2. Access your application  
+# API Documentation: http://localhost:8080/docs
+# Health Check: http://localhost:8080/health
+# API Endpoints: http://localhost:8080/v1/
 ```
 
 ## 📋 Prerequisites
@@ -101,13 +101,13 @@ After deployment, access these endpoints:
 
 | Endpoint | URL | Description |
 |----------|-----|-------------|
-| **API Documentation** | http://localhost/docs | Interactive Swagger UI |
-| **Alternative Docs** | http://localhost/redoc | ReDoc documentation |
-| **Health Check** | http://localhost/health | Service health status |
-| **Product API** | http://localhost/v1/products/{asin} | Product data endpoint |
-| **Competition API** | http://localhost/v1/competitions/{asin} | Competition analysis |
-| **GraphQL** | http://localhost/graphql | GraphQL endpoint |
-| **Metrics** | http://localhost/metrics | Prometheus metrics |
+| **API Documentation** | http://localhost:8080/docs | Interactive Swagger UI |
+| **Alternative Docs** | http://localhost:8080/redoc | ReDoc documentation |
+| **Health Check** | http://localhost:8080/health | Service health status |
+| **Product API** | http://localhost:8080/v1/products/{asin} | Product data endpoint |
+| **Competition API** | http://localhost:8080/v1/competitions/{asin} | Competition analysis |
+| **GraphQL** | http://localhost:8080/graphql | GraphQL endpoint |
+| **Metrics** | http://localhost:8080/metrics | Prometheus metrics |
 
 ## 🔍 Validation & Testing
 
@@ -115,7 +115,7 @@ After deployment, access these endpoints:
 
 ```bash
 # Check overall health
-curl http://localhost/health
+curl http://localhost:8080/health
 
 # Expected response:
 {
@@ -132,7 +132,7 @@ curl http://localhost/health
 
 ```bash
 # Test with real ASIN from your Supabase data
-curl http://localhost/v1/products/B0C6KKQ7ND
+curl http://localhost:8080/v1/products/B0C6KKQ7ND
 
 # Expected response:
 {
@@ -151,17 +151,17 @@ curl http://localhost/v1/products/B0C6KKQ7ND
 
 ```bash
 # First request (cache miss)
-curl -w "%{time_total}" http://localhost/v1/products/B0C6KKQ7ND
+curl -w "%{time_total}" http://localhost:8080/v1/products/B0C6KKQ7ND
 
 # Second request (cache hit - should be faster)
-curl -w "%{time_total}" http://localhost/v1/products/B0C6KKQ7ND
+curl -w "%{time_total}" http://localhost:8080/v1/products/B0C6KKQ7ND
 ```
 
 ### 4. Competition Analysis Test
 
 ```bash
 # Set up competitors for a product
-curl -X POST http://localhost/v1/competitions/setup \
+curl -X POST http://localhost:8080/v1/competitions/setup \
   -H "Content-Type: application/json" \
   -d '{
     "asin_main": "B0C6KKQ7ND",
@@ -169,7 +169,7 @@ curl -X POST http://localhost/v1/competitions/setup \
   }'
 
 # Get competition data
-curl http://localhost/v1/competitions/B0C6KKQ7ND?days_back=30
+curl http://localhost:8080/v1/competitions/B0C6KKQ7ND?days_back=30
 ```
 
 ## 🐛 Troubleshooting
