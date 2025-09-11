@@ -113,30 +113,34 @@ class TestETagUtilities:
 class TestRateLimiter:
     """Test rate limiting functionality."""
     
-    @pytest.fixture
-    def mock_redis(self):
-        """Mock Redis client."""
-        from unittest.mock import MagicMock
+    def create_proper_redis_mock(self, pipeline_execute_result=None):
+        """Create properly mocked Redis client that mimics real Redis pipeline behavior."""
+        from unittest.mock import Mock
         
-        # Create a mock pipeline that supports method chaining
-        pipeline_mock = MagicMock()
-        pipeline_mock.zremrangebyscore.return_value = pipeline_mock
-        pipeline_mock.zcard.return_value = pipeline_mock
-        pipeline_mock.zadd.return_value = pipeline_mock
-        pipeline_mock.expire.return_value = pipeline_mock
-        pipeline_mock.execute = AsyncMock(return_value=[None, 0, 1, True])
+        # Create pipeline mock - Redis pipelines are synchronous objects
+        pipeline_mock = Mock()
+        pipeline_mock.zremrangebyscore.return_value = pipeline_mock  # Chaining
+        pipeline_mock.zcard.return_value = pipeline_mock           # Chaining  
+        pipeline_mock.zadd.return_value = pipeline_mock            # Chaining
+        pipeline_mock.expire.return_value = pipeline_mock          # Chaining
+        # Only execute() is async
+        pipeline_mock.execute = AsyncMock(return_value=pipeline_execute_result or [None, 0, 1, True])
         
-        redis_mock = AsyncMock()
-        redis_mock.pipeline.return_value = pipeline_mock
+        # Create Redis client mock - most methods are async, but pipeline() is sync
+        redis_mock = Mock()
+        redis_mock.pipeline.return_value = pipeline_mock  # Sync method returns pipeline
         redis_mock.zrem = AsyncMock(return_value=1)
         redis_mock.delete = AsyncMock(return_value=1)
         
         return redis_mock
     
     @pytest.mark.asyncio
-    async def test_rate_limiter_allow_first_request(self, mock_redis):
+    async def test_rate_limiter_allow_first_request(self):
         """Test first request is allowed."""
-        limiter = RateLimiter(mock_redis)
+        # Mock Redis pipeline that shows 0 existing requests
+        redis_mock = self.create_proper_redis_mock([None, 0, 1, True])
+        
+        limiter = RateLimiter(redis_mock)
         rule = RateLimitRule(requests=10, window_seconds=60)
         
         allowed, info = await limiter.is_allowed("test_key", rule)
@@ -144,23 +148,15 @@ class TestRateLimiter:
         assert allowed is True
         assert info['limit'] == 10
         assert info['remaining'] >= 0
+        assert 'reset' in info
     
     @pytest.mark.asyncio
-    async def test_rate_limiter_block_exceeded_requests(self, mock_redis):
+    async def test_rate_limiter_block_exceeded_requests(self):
         """Test rate limiter blocks when limit exceeded."""
-        # Create a separate pipeline mock for this test case with high request count
-        from unittest.mock import MagicMock
+        # Mock Redis pipeline that shows 15 existing requests (over limit of 10)
+        redis_mock = self.create_proper_redis_mock([None, 15, 1, True])
         
-        pipeline_mock = MagicMock()
-        pipeline_mock.zremrangebyscore.return_value = pipeline_mock
-        pipeline_mock.zcard.return_value = pipeline_mock
-        pipeline_mock.zadd.return_value = pipeline_mock
-        pipeline_mock.expire.return_value = pipeline_mock
-        pipeline_mock.execute = AsyncMock(return_value=[None, 15, 1, True])  # 15 existing requests
-        
-        mock_redis.pipeline.return_value = pipeline_mock
-        
-        limiter = RateLimiter(mock_redis)
+        limiter = RateLimiter(redis_mock)
         rule = RateLimitRule(requests=10, window_seconds=60)
         
         allowed, info = await limiter.is_allowed("test_key", rule)
@@ -189,6 +185,35 @@ class TestRateLimiter:
         
         rule_with_burst = RateLimitRule(requests=100, window_seconds=3600, burst=150)
         assert rule_with_burst.burst == 150
+    
+    @pytest.mark.asyncio
+    async def test_rate_limiter_redis_error_handling(self):
+        """Test rate limiter handles Redis errors gracefully."""
+        # Create a Redis mock that raises an exception during pipeline execution
+        redis_mock = self.create_proper_redis_mock()
+        redis_mock.pipeline.return_value.execute = AsyncMock(side_effect=Exception("Redis connection failed"))
+        
+        limiter = RateLimiter(redis_mock)
+        rule = RateLimitRule(requests=10, window_seconds=60)
+        
+        # Should fall back to allowing the request when Redis fails
+        allowed, info = await limiter.is_allowed("test_key", rule)
+        
+        assert allowed is True  # Should allow when Redis fails
+        assert info['limit'] == 10
+    
+    @pytest.mark.asyncio
+    async def test_rate_limiter_reset_functionality(self):
+        """Test rate limit reset functionality."""
+        redis_mock = self.create_proper_redis_mock()
+        
+        limiter = RateLimiter(redis_mock)
+        
+        result = await limiter.reset_limit("test_key")
+        
+        # Should call Redis delete and return success
+        redis_mock.delete.assert_called_once_with("test_key")
+        assert result is True
 
 
 class TestCacheInvalidation:
