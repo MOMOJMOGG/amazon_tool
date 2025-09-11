@@ -113,7 +113,7 @@ class CompetitorComparisonService:
         async with get_db_session() as session:
             links_stmt = select(CompetitorLink)
             links_result = await session.execute(links_stmt)
-            competitor_links = links_result.fetchall()
+            competitor_links = links_result.scalars().all()
         
         if not competitor_links:
             logger.info(f"No competitor links found for date {target_date}")
