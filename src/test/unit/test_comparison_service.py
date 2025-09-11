@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime, date, timedelta
 
 from src.main.services.comparison import CompetitorComparisonService, ComparisonError
+from src.test.fixtures.real_test_data import RealTestData, get_test_asin
 
 
 class TestCompetitorComparisonService:
@@ -17,17 +18,17 @@ class TestCompetitorComparisonService:
     # Real ASINs from our loaded Apify dataset
     @pytest.fixture
     def real_main_asin(self):
-        return "B0FDKB341G"  # Wireless earbuds from real data
+        return RealTestData.PRIMARY_TEST_ASIN  # Soundcore headphones from real data
     
     @pytest.fixture
     def real_competitor_asins(self):
         # Real competitor ASINs from config file (marked as 'comp' not 'main')
-        return ["B0F6BJSTSQ", "B0CHYJT52D", "B0F9DM91VJ", "B0CG2Z78TL", "B0C6KKQ7ND"]
+        return RealTestData.ALTERNATIVE_TEST_ASINS[:2] + ["B0CHYJT52D", "B0F9DM91VJ", "B0CG2Z78TL"]
     
     @pytest.fixture
     def mock_competitor_asins(self):
         # Fallback mock data for testing scenarios
-        return ["B08N5WRWNW", "B09JVCL7JR", "B0FDK6TTSG", "B0FDKB341G", "B0F6BJSTSQ"]
+        return [get_test_asin(prefer_real=False), "B09JVCL7JR", "B0FDK6TTSG", RealTestData.PRIMARY_TEST_ASIN, RealTestData.ALTERNATIVE_TEST_ASINS[0]]
     
     @pytest.mark.asyncio
     async def test_setup_competitor_links_with_real_data(self, service, real_main_asin, real_competitor_asins):
@@ -97,7 +98,7 @@ class TestCompetitorComparisonService:
     async def test_setup_competitor_links_skips_self_reference(self, service):
         """Test that self-references are skipped."""
         main_asin = "B08TEST123"
-        competitor_asins = ["B08N5WRWNW", main_asin, "B09JVCL7JR"]  # Include self
+        competitor_asins = [RealTestData.ALTERNATIVE_TEST_ASINS[0], main_asin, RealTestData.ALTERNATIVE_TEST_ASINS[1]]  # Include self
         
         with patch('src.main.services.comparison.get_db_session') as mock_session:
             mock_db = AsyncMock()
@@ -116,7 +117,7 @@ class TestCompetitorComparisonService:
     async def test_get_competitor_links_success(self, service):
         """Test getting competitor ASINs for a main product."""
         main_asin = "B08TEST123"
-        expected_competitors = ["B08N5WRWNW", "B09JVCL7JR", "B0FDK6TTSG"]
+        expected_competitors = [RealTestData.ALTERNATIVE_TEST_ASINS[0], RealTestData.ALTERNATIVE_TEST_ASINS[1], RealTestData.ALTERNATIVE_TEST_ASINS[2]]
         
         with patch('src.main.services.comparison.get_db_session') as mock_session:
             mock_db = AsyncMock()
@@ -136,7 +137,7 @@ class TestCompetitorComparisonService:
     async def test_get_competitor_links_cached(self, service):
         """Test getting competitor ASINs (note: caching not implemented yet)."""
         main_asin = "B08TEST123"
-        expected_competitors = ["B08N5WRWNW", "B09JVCL7JR"]
+        expected_competitors = [RealTestData.ALTERNATIVE_TEST_ASINS[0], RealTestData.ALTERNATIVE_TEST_ASINS[1]]
         
         # Mock database since get_competitor_links doesn't use caching yet
         with patch('src.main.services.comparison.get_db_session') as mock_session:
@@ -186,7 +187,7 @@ class TestCompetitorComparisonService:
             # Mock competitor links
             mock_link1 = MagicMock()
             mock_link1.asin_main = "B08TEST123"
-            mock_link1.asin_comp = "B08N5WRWNW"
+            mock_link1.asin_comp = RealTestData.ALTERNATIVE_TEST_ASINS[0]
             
             mock_link2 = MagicMock()
             mock_link2.asin_main = "B08TEST123"
@@ -233,7 +234,7 @@ class TestCompetitorComparisonService:
             # Mock competitor links
             mock_link1 = MagicMock()
             mock_link1.asin_main = "B08TEST123"
-            mock_link1.asin_comp = "B08N5WRWNW"
+            mock_link1.asin_comp = RealTestData.ALTERNATIVE_TEST_ASINS[0]
             
             mock_links_result = MagicMock()
             mock_links_result.scalars.return_value.all.return_value = [mock_link1]
@@ -267,7 +268,7 @@ class TestCompetitorComparisonService:
             # Mock comparison data
             mock_comparison = MagicMock()
             mock_comparison.asin_main = main_asin
-            mock_comparison.asin_comp = "B08N5WRWNW"
+            mock_comparison.asin_comp = RealTestData.ALTERNATIVE_TEST_ASINS[0]
             mock_comparison.date = date.today()
             mock_comparison.price_diff = -10.0
             mock_comparison.rating_diff = 0.5
@@ -291,7 +292,7 @@ class TestCompetitorComparisonService:
         """Test competition data retrieval (note: caching temporarily disabled)."""
         main_asin = "B08TEST123"
         days_back = 7
-        expected_data = [{"asin_main": main_asin, "asin_comp": "B08N5WRWNW"}]
+        expected_data = [{"asin_main": main_asin, "asin_comp": RealTestData.ALTERNATIVE_TEST_ASINS[0]}]
         
         # Mock database since caching is temporarily disabled
         with patch('src.main.services.comparison.get_db_session') as mock_session:

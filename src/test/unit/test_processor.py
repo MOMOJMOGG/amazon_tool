@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from datetime import datetime, date
 
 from src.main.services.processor import CoreMetricsProcessor, ProcessingError
+from src.test.fixtures.real_test_data import RealTestData, get_test_asin
 
 
 class TestCoreMetricsProcessor:
@@ -19,13 +20,13 @@ class TestCoreMetricsProcessor:
         """Mock raw event with complete product data."""
         mock_event = MagicMock()
         mock_event.id = "event-123"
-        mock_event.asin = "B08N5WRWNW"
+        mock_event.asin = RealTestData.PRIMARY_TEST_ASIN
         mock_event.job_id = "job-456"
         mock_event.ingested_at = datetime.now()
         mock_event.raw_data = {
-            "asin": "B08N5WRWNW",
-            "title": "Echo Dot (4th Gen)",
-            "brand": "Amazon",
+            "asin": RealTestData.PRIMARY_TEST_ASIN,
+            "title": RealTestData.PRIMARY_PRODUCT_TITLE,
+            "brand": RealTestData.PRIMARY_PRODUCT_BRAND,
             "category": "Electronics",
             "image_url": "https://example.com/image.jpg",
             "price": 49.99,
@@ -150,7 +151,7 @@ class TestCoreMetricsProcessor:
         mock_session.add.assert_called_once()
         # Verify the added product has correct attributes
         added_product = mock_session.add.call_args[0][0]
-        assert added_product.asin == "B08N5WRWNW"
+        assert added_product.asin == RealTestData.PRIMARY_TEST_ASIN
         assert added_product.title == "Echo Dot (4th Gen)"
     
     @pytest.mark.asyncio
@@ -160,7 +161,7 @@ class TestCoreMetricsProcessor:
         
         # Mock existing product
         existing_product = MagicMock()
-        existing_product.asin = "B08N5WRWNW"
+        existing_product.asin = RealTestData.PRIMARY_TEST_ASIN
         existing_product.title = "Old Title"
         existing_product.brand = "Old Brand"
         

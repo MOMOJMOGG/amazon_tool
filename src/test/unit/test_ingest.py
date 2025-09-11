@@ -7,6 +7,7 @@ import uuid
 
 from src.main.services.ingest import IngestionService
 from src.main.models.staging import RawProductEventCreate, JobStatus
+from src.test.fixtures.real_test_data import RealTestData, get_test_asin
 
 
 class TestIngestionService:
@@ -19,11 +20,11 @@ class TestIngestionService:
     @pytest.fixture
     def sample_raw_event(self):
         return RawProductEventCreate(
-            asin="B08N5WRWNW",
+            asin=RealTestData.PRIMARY_TEST_ASIN,
             source="test_source",
             event_type="product_update",
             raw_data={
-                "asin": "B08N5WRWNW",
+                "asin": RealTestData.PRIMARY_TEST_ASIN,
                 "title": "Test Product",
                 "price": 49.99,
                 "bsr": 1000,
