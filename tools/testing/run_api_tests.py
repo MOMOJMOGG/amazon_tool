@@ -138,11 +138,11 @@ class APITester:
             "POST",
             f"{BASE_URL}/v1/etl/events/ingest",
             {
-                "asin": "RealTestData.PRIMARY_TEST_ASIN",
+                "asin": RealTestData.PRIMARY_TEST_ASIN,
                 "source": "api_test",
                 "event_type": "product_update",
                 "raw_data": {
-                    "asin": "RealTestData.PRIMARY_TEST_ASIN",
+                    "asin": RealTestData.PRIMARY_TEST_ASIN,
                     "title": "Soundcore by Anker, Space One, Active Noise Cancelling Headphones API Test",
                     "brand": "Amazon",
                     "price": 49.99,

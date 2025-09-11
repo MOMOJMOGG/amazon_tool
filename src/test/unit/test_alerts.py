@@ -83,7 +83,7 @@ class TestAlertService:
             mock_db.execute = AsyncMock(side_effect=[prev_result, summary_result])
             
             alerts = await alert_service._detect_product_alerts(
-                mock_db, "RealTestData.PRIMARY_TEST_ASIN", date.today(), date.today() - timedelta(days=1),
+                mock_db, RealTestData.PRIMARY_TEST_ASIN, date.today(), date.today() - timedelta(days=1),
                 50.0, 1000  # current_price, current_bsr
             )
             
@@ -119,7 +119,7 @@ class TestAlertService:
             mock_db.execute = AsyncMock(side_effect=[prev_result, summary_result])
             
             alerts = await alert_service._detect_product_alerts(
-                mock_db, "RealTestData.PRIMARY_TEST_ASIN", date.today(), date.today() - timedelta(days=1),
+                mock_db, RealTestData.PRIMARY_TEST_ASIN, date.today(), date.today() - timedelta(days=1),
                 50.0, 1000  # current_price, current_bsr
             )
             
@@ -131,7 +131,7 @@ class TestAlertService:
     def test_check_price_alerts_spike(self, alert_service):
         """Test price spike detection logic."""
         alerts = alert_service._check_price_alerts(
-            "RealTestData.PRIMARY_TEST_ASIN", 50.0, 40.0, 42.0  # current, previous, baseline
+            RealTestData.PRIMARY_TEST_ASIN, 50.0, 40.0, 42.0  # current, previous, baseline
         )
         
         # 25% increase should trigger both 15% medium and 30% thresholds (but only 15%)
@@ -143,7 +143,7 @@ class TestAlertService:
     def test_check_price_alerts_drop(self, alert_service):
         """Test price drop detection logic."""
         alerts = alert_service._check_price_alerts(
-            "RealTestData.PRIMARY_TEST_ASIN", 30.0, 50.0, 45.0  # current, previous, baseline
+            RealTestData.PRIMARY_TEST_ASIN, 30.0, 50.0, 45.0  # current, previous, baseline
         )
         
         # -40% drop should trigger the -20% threshold
@@ -155,7 +155,7 @@ class TestAlertService:
     def test_check_bsr_alerts_jump(self, alert_service):
         """Test BSR jump detection logic."""
         alerts = alert_service._check_bsr_alerts(
-            "RealTestData.PRIMARY_TEST_ASIN", 2000, 1000, 1100.0  # current, previous, baseline
+            RealTestData.PRIMARY_TEST_ASIN, 2000, 1000, 1100.0  # current, previous, baseline
         )
         
         # 100% increase (worse ranking) should trigger both 50% and 100% thresholds
@@ -167,20 +167,20 @@ class TestAlertService:
     def test_generate_alert_message(self, alert_service):
         """Test alert message generation."""
         message = alert_service._generate_alert_message(
-            "price_spike", "RealTestData.PRIMARY_TEST_ASIN", 60.0, 50.0, 20.0
+            "price_spike", RealTestData.PRIMARY_TEST_ASIN, 60.0, 50.0, 20.0
         )
         
-        expected_parts = ["price spike", "RealTestData.PRIMARY_TEST_ASIN", "$50.00", "$60.00", "+20.0%"]
+        expected_parts = ["price spike", RealTestData.PRIMARY_TEST_ASIN, "$50.00", "$60.00", "+20.0%"]
         for part in expected_parts:
             assert part.lower() in message.lower()
     
     def test_generate_bsr_alert_message(self, alert_service):
         """Test BSR alert message generation."""
         message = alert_service._generate_bsr_alert_message(
-            "bsr_improve", "RealTestData.PRIMARY_TEST_ASIN", 800, 1000, -20.0
+            "bsr_improve", RealTestData.PRIMARY_TEST_ASIN, 800, 1000, -20.0
         )
         
-        expected_parts = ["bsr improvement", "RealTestData.PRIMARY_TEST_ASIN", "#1000", "#800", "-20.0%"]
+        expected_parts = ["bsr improvement", RealTestData.PRIMARY_TEST_ASIN, "#1000", "#800", "-20.0%"]
         for part in expected_parts:
             assert part.lower() in message.lower()
     
@@ -199,7 +199,7 @@ class TestAlertService:
             mock_result.scalars.return_value = mock_scalars
             mock_db.execute = AsyncMock(return_value=mock_result)
             
-            alerts = await alert_service.get_active_alerts(asin="RealTestData.PRIMARY_TEST_ASIN", limit=10)
+            alerts = await alert_service.get_active_alerts(asin=RealTestData.PRIMARY_TEST_ASIN, limit=10)
             
             assert alerts == mock_alerts
             mock_db.execute.assert_called_once()

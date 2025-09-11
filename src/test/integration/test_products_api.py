@@ -106,13 +106,13 @@ class TestProductsAPI:
                 assert response.status_code == 200
                 data = response.json()
                 
-                assert data["data"]["asin"] == "RealTestData.PRIMARY_TEST_ASIN"
+                assert data["data"]["asin"] == RealTestData.PRIMARY_TEST_ASIN
                 assert data["data"]["title"] == sample_product_data["title"]
                 assert data["cached"] is False
                 assert data["stale_at"] is None
                 
                 # Verify metrics were recorded
-                mock_record_product.assert_called_once_with("RealTestData.PRIMARY_TEST_ASIN", False)
+                mock_record_product.assert_called_once_with(RealTestData.PRIMARY_TEST_ASIN, False)
                 mock_record_cache.assert_called_once_with("get", "miss")
     
     @pytest.mark.asyncio
@@ -133,12 +133,12 @@ class TestProductsAPI:
                 assert response.status_code == 200
                 data = response.json()
                 
-                assert data["data"]["asin"] == "RealTestData.PRIMARY_TEST_ASIN"
+                assert data["data"]["asin"] == RealTestData.PRIMARY_TEST_ASIN
                 assert data["cached"] is True
                 assert data["stale_at"] is not None
                 
                 # Verify metrics were recorded
-                mock_record_product.assert_called_once_with("RealTestData.PRIMARY_TEST_ASIN", True)
+                mock_record_product.assert_called_once_with(RealTestData.PRIMARY_TEST_ASIN, True)
                 mock_record_cache.assert_called_once_with("get", "hit")
     
     @pytest.mark.asyncio

@@ -93,7 +93,7 @@ class TestETLPipeline:
                 data = response.json()
                 assert data["event_id"] == "test-event-id-123"
                 assert data["status"] == "ingested"
-                assert "RealTestData.PRIMARY_TEST_ASIN" in data["message"]
+                assert RealTestData.PRIMARY_TEST_ASIN in data["message"]
     
     @pytest.mark.asyncio
     async def test_job_trigger_api(self):
@@ -190,7 +190,7 @@ class TestETLPipeline:
                 # Mock active alerts
                 mock_alert = MagicMock()
                 mock_alert.id = "alert-123"
-                mock_alert.asin = "RealTestData.PRIMARY_TEST_ASIN"
+                mock_alert.asin = RealTestData.PRIMARY_TEST_ASIN
                 mock_alert.alert_type = "price_spike"
                 mock_alert.severity = "medium"
                 mock_alert.current_value = 59.99
@@ -209,7 +209,7 @@ class TestETLPipeline:
                 assert len(data) == 1
                 assert data[0]["id"] == "alert-123"
                 assert data[0]["alert_type"] == "price_spike"
-                assert data[0]["asin"] == "RealTestData.PRIMARY_TEST_ASIN"
+                assert data[0]["asin"] == RealTestData.PRIMARY_TEST_ASIN
     
     @pytest.mark.asyncio
     async def test_alert_resolution_api(self):
