@@ -4,7 +4,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, Optional, Tuple, Callable
+from typing import Any, Dict, Optional, Tuple, Callable, Set
 
 # Handle Redis import gracefully - Redis might not be installed in test environments
 try:
@@ -20,20 +20,23 @@ from src.main.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Global Redis connection
+# Global Redis connections
 redis_client: Optional[Any] = None
+redis_pubsub_client: Optional[Any] = None
 
 
 async def init_redis() -> None:
-    """Initialize Redis connection."""
-    global redis_client
+    """Initialize Redis connections."""
+    global redis_client, redis_pubsub_client
     
     if not REDIS_AVAILABLE:
         logger.warning("Redis module not available - cache service will work without Redis")
         redis_client = None
+        redis_pubsub_client = None
         return
     
     try:
+        # Main Redis client for caching
         redis_client = redis.from_url(
             settings.redis_url,
             decode_responses=True,
@@ -42,9 +45,19 @@ async def init_redis() -> None:
             socket_keepalive_options={},
         )
         
-        # Test connection
+        # Separate Redis client for pub/sub
+        redis_pubsub_client = redis.from_url(
+            settings.redis_url,
+            decode_responses=True,
+            retry_on_timeout=True,
+            socket_keepalive=True,
+            socket_keepalive_options={},
+        )
+        
+        # Test connections
         await redis_client.ping()
-        logger.info("Redis connection initialized successfully")
+        await redis_pubsub_client.ping()
+        logger.info("Redis connections initialized successfully")
         
     except RedisError as e:
         logger.error(f"Failed to initialize Redis: {e}")
@@ -55,13 +68,18 @@ async def init_redis() -> None:
 
 
 async def close_redis() -> None:
-    """Close Redis connection."""
-    global redis_client
+    """Close Redis connections."""
+    global redis_client, redis_pubsub_client
     
     if redis_client:
         await redis_client.close()
         redis_client = None
-        logger.info("Redis connection closed")
+    
+    if redis_pubsub_client:
+        await redis_pubsub_client.close()
+        redis_pubsub_client = None
+    
+    logger.info("Redis connections closed")
 
 
 async def check_redis_health() -> bool:
@@ -130,10 +148,11 @@ class CacheEntry:
 
 
 class CacheService:
-    """Redis cache service with SWR pattern."""
+    """Redis cache service with SWR pattern and pub/sub invalidation."""
     
     def __init__(self):
         self._background_tasks = set()
+        self._invalidation_listeners: Set[Callable] = set()
     
     async def get_or_set(
         self,
@@ -331,6 +350,112 @@ class CacheService:
         except (TypeError, ValueError) as e:
             logger.error(f"Failed to serialize data for key {key}: {e}")
             return False
+    
+    async def publish_invalidation(self, pattern: str, reason: str = "update") -> bool:
+        """
+        Publish cache invalidation event.
+        
+        Args:
+            pattern: Cache key pattern to invalidate (supports wildcards)
+            reason: Reason for invalidation (for logging)
+        """
+        if not redis_pubsub_client:
+            return False
+        
+        try:
+            message = {
+                'pattern': pattern,
+                'reason': reason,
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+            await redis_pubsub_client.publish(
+                'cache_invalidation',
+                json.dumps(message)
+            )
+            
+            logger.info(f"Published cache invalidation for pattern: {pattern} (reason: {reason})")
+            return True
+            
+        except RedisError as e:
+            logger.error(f"Failed to publish invalidation for pattern {pattern}: {e}")
+            return False
+    
+    async def subscribe_to_invalidations(self) -> None:
+        """Subscribe to cache invalidation events and process them."""
+        if not redis_pubsub_client:
+            logger.warning("Redis pub/sub not available for cache invalidation")
+            return
+        
+        try:
+            pubsub = redis_pubsub_client.pubsub()
+            await pubsub.subscribe('cache_invalidation')
+            
+            logger.info("Subscribed to cache invalidation events")
+            
+            async for message in pubsub.listen():
+                if message['type'] == 'message':
+                    try:
+                        data = json.loads(message['data'])
+                        pattern = data['pattern']
+                        reason = data.get('reason', 'unknown')
+                        
+                        # Invalidate matching cache keys
+                        deleted_count = await self.delete_pattern(pattern)
+                        
+                        logger.info(f"Invalidated {deleted_count} cache keys for pattern: {pattern} (reason: {reason})")
+                        
+                        # Notify listeners
+                        for listener in self._invalidation_listeners:
+                            try:
+                                await listener(pattern, reason, deleted_count)
+                            except Exception as e:
+                                logger.error(f"Error in invalidation listener: {e}")
+                                
+                    except json.JSONDecodeError as e:
+                        logger.error(f"Invalid invalidation message: {e}")
+                    except Exception as e:
+                        logger.error(f"Error processing invalidation message: {e}")
+                        
+        except RedisError as e:
+            logger.error(f"Redis error in invalidation subscription: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error in invalidation subscription: {e}")
+    
+    def add_invalidation_listener(self, listener: Callable) -> None:
+        """Add a listener for cache invalidation events."""
+        self._invalidation_listeners.add(listener)
+    
+    def remove_invalidation_listener(self, listener: Callable) -> None:
+        """Remove a cache invalidation listener."""
+        self._invalidation_listeners.discard(listener)
+    
+    async def invalidate_product_cache(self, asin: str) -> bool:
+        """Invalidate all cache entries for a specific product."""
+        pattern = f"product:{asin}:*"
+        return await self.publish_invalidation(pattern, f"product_update:{asin}")
+    
+    async def invalidate_competition_cache(self, asin_main: str) -> bool:
+        """Invalidate all competition cache entries for a main product."""
+        pattern = f"competition:{asin_main}:*"
+        return await self.publish_invalidation(pattern, f"competition_update:{asin_main}")
+    
+    async def invalidate_all_products_cache(self) -> bool:
+        """Invalidate all product cache entries."""
+        pattern = "product:*"
+        return await self.publish_invalidation(pattern, "bulk_product_update")
+    
+    async def start_invalidation_listener(self) -> None:
+        """Start the background invalidation listener."""
+        if not redis_pubsub_client:
+            logger.warning("Cannot start invalidation listener - Redis pub/sub not available")
+            return
+        
+        task = asyncio.create_task(self.subscribe_to_invalidations())
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+        
+        logger.info("Started cache invalidation listener")
 
 
 # Global cache service instance

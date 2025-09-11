@@ -1,9 +1,9 @@
 """Product data models."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Union
 from sqlalchemy import Column, String, DateTime, Numeric, Integer, Text
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator
 
 from src.main.database import Base
 
@@ -77,3 +77,35 @@ class ProductResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+
+class BatchProductRequest(BaseModel):
+    """Batch product request model."""
+    asins: List[str] = Field(..., min_items=1, max_items=50, description="List of ASINs to fetch")
+    
+    @validator('asins')
+    def validate_asins(cls, v):
+        """Validate ASIN format."""
+        for asin in v:
+            if not asin or len(asin.strip()) != 10 or not asin.strip().isalnum():
+                raise ValueError(f"Invalid ASIN format: {asin}")
+        return [asin.strip().upper() for asin in v]
+
+
+class BatchProductItem(BaseModel):
+    """Individual product item in batch response."""
+    asin: str
+    success: bool
+    data: Optional[ProductWithMetrics] = None
+    error: Optional[str] = None
+    cached: bool = False
+    stale_at: Optional[datetime] = None
+
+
+class BatchProductResponse(BaseModel):
+    """Batch product response model."""
+    total_requested: int
+    total_success: int
+    total_failed: int
+    items: List[BatchProductItem]
+    processed_at: datetime = Field(default_factory=datetime.utcnow)

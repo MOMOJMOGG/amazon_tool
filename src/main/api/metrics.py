@@ -49,6 +49,44 @@ competition_requests_total = Counter(
     ["operation"]  # operation: competition_data/competitor_setup/competitor_removal
 )
 
+# M4: Batch operations metrics
+batch_requests_total = Counter(
+    "batch_requests_total",
+    "Total number of batch requests",
+    ["endpoint", "status"]  # endpoint: products_batch, status: success/error
+)
+
+batch_request_size = Histogram(
+    "batch_request_size",
+    "Size of batch requests (number of items)",
+    ["endpoint"],
+    buckets=[1, 5, 10, 20, 30, 40, 50]
+)
+
+batch_processing_duration_seconds = Histogram(
+    "batch_processing_duration_seconds",
+    "Batch request processing duration in seconds",
+    ["endpoint"]
+)
+
+rate_limit_requests_total = Counter(
+    "rate_limit_requests_total",
+    "Total number of rate limited requests",
+    ["endpoint", "client_type"]  # client_type: ip_based/user_based
+)
+
+etag_requests_total = Counter(
+    "etag_requests_total",
+    "Total number of ETag-enabled requests",
+    ["endpoint", "result"]  # result: hit_304/miss/generated
+)
+
+cache_invalidations_total = Counter(
+    "cache_invalidations_total",
+    "Total number of cache invalidation events",
+    ["pattern", "reason"]  # pattern: product:*/competition:*, reason: update/bulk_update
+)
+
 
 @router.get("/metrics")
 async def get_metrics():
@@ -104,3 +142,27 @@ def set_redis_connections(count: int):
 async def record_competition_request(operation: str):
     """Record competition analysis request metrics."""
     competition_requests_total.labels(operation=operation).inc()
+
+
+# M4: Batch and optimization metrics functions
+def record_batch_request(endpoint: str, status: str, size: int, duration: float = None):
+    """Record batch request metrics."""
+    batch_requests_total.labels(endpoint=endpoint, status=status).inc()
+    batch_request_size.labels(endpoint=endpoint).observe(size)
+    if duration is not None:
+        batch_processing_duration_seconds.labels(endpoint=endpoint).observe(duration)
+
+
+def record_rate_limit(endpoint: str, client_type: str = "ip_based"):
+    """Record rate limit hit."""
+    rate_limit_requests_total.labels(endpoint=endpoint, client_type=client_type).inc()
+
+
+def record_etag_request(endpoint: str, result: str):
+    """Record ETag request result."""
+    etag_requests_total.labels(endpoint=endpoint, result=result).inc()
+
+
+def record_cache_invalidation(pattern: str, reason: str):
+    """Record cache invalidation event."""
+    cache_invalidations_total.labels(pattern=pattern, reason=reason).inc()
