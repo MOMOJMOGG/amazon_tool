@@ -28,133 +28,68 @@ DEMO_ASINS = {
 class DemoAPIClient:
     """API client for demo interactions."""
     
-    def __init__(self):
-        self.client = httpx.AsyncClient(timeout=30.0)
+    async def make_request(self, method: str, url: str, **kwargs) -> Dict[str, Any]:
+        """Make HTTP request with fresh client to avoid connection issues."""
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                if method.upper() == "GET":
+                    response = await client.get(url, **kwargs)
+                elif method.upper() == "POST":
+                    response = await client.post(url, **kwargs)
+                else:
+                    raise ValueError(f"Unsupported method: {method}")
+                
+                return {
+                    "success": True,
+                    "data": response.json(),
+                    "status_code": response.status_code,
+                    "response_time": response.elapsed.total_seconds()
+                }
+        except Exception as e:
+            return {"success": False, "error": str(e)}
     
     async def get_product(self, asin: str) -> Dict[str, Any]:
         """Get product details."""
-        try:
-            response = await self.client.get(f"{API_BASE_URL}/v1/products/{asin}")
-            return {
-                "success": True,
-                "data": response.json(),
-                "status_code": response.status_code,
-                "response_time": response.elapsed.total_seconds()
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        return await self.make_request("GET", f"{API_BASE_URL}/v1/products/{asin}")
     
     async def get_product_metrics(self, asin: str, range_param: str = "30d") -> Dict[str, Any]:
         """Get product historical metrics."""
-        try:
-            response = await self.client.get(f"{API_BASE_URL}/v1/products/{asin}/metrics?range={range_param}")
-            return {
-                "success": True,
-                "data": response.json(),
-                "status_code": response.status_code,
-                "response_time": response.elapsed.total_seconds()
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        return await self.make_request("GET", f"{API_BASE_URL}/v1/products/{asin}/metrics?range={range_param}")
     
     async def get_batch_products(self, asins: List[str]) -> Dict[str, Any]:
         """Get multiple products in batch."""
-        try:
-            response = await self.client.get(f"{API_BASE_URL}/v1/products/metrics:batch?asins=" + ",".join(asins))
-            return {
-                "success": True,
-                "data": response.json(),
-                "status_code": response.status_code,
-                "response_time": response.elapsed.total_seconds()
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        return await self.make_request("GET", f"{API_BASE_URL}/v1/products/metrics:batch?asins=" + ",".join(asins))
     
     async def setup_competition(self, main_asin: str, competitor_asins: List[str]) -> Dict[str, Any]:
         """Setup competitive analysis."""
-        try:
-            payload = {
-                "asin_main": main_asin,
-                "competitor_asins": competitor_asins
-            }
-            response = await self.client.post(f"{API_BASE_URL}/v1/competitions/setup", json=payload)
-            return {
-                "success": True,
-                "data": response.json(),
-                "status_code": response.status_code,
-                "response_time": response.elapsed.total_seconds()
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        payload = {
+            "asin_main": main_asin,
+            "competitor_asins": competitor_asins
+        }
+        return await self.make_request("POST", f"{API_BASE_URL}/v1/competitions/setup", json=payload)
     
     async def get_competition(self, asin: str, range_param: str = "30d") -> Dict[str, Any]:
         """Get competition analysis."""
-        try:
-            response = await self.client.get(f"{API_BASE_URL}/v1/competitions/{asin}?range={range_param}")
-            return {
-                "success": True,
-                "data": response.json(),
-                "status_code": response.status_code,
-                "response_time": response.elapsed.total_seconds()
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        return await self.make_request("GET", f"{API_BASE_URL}/v1/competitions/{asin}?range={range_param}")
     
     async def get_competition_report(self, asin: str) -> Dict[str, Any]:
         """Get AI-generated competition report."""
-        try:
-            response = await self.client.get(f"{API_BASE_URL}/v1/competitions/{asin}/report")
-            return {
-                "success": True,
-                "data": response.json(),
-                "status_code": response.status_code,
-                "response_time": response.elapsed.total_seconds()
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        return await self.make_request("GET", f"{API_BASE_URL}/v1/competitions/{asin}/report")
     
     async def refresh_report(self, asin: str) -> Dict[str, Any]:
         """Trigger report refresh."""
-        try:
-            response = await self.client.post(f"{API_BASE_URL}/v1/competitions/{asin}/report:refresh")
-            return {
-                "success": True,
-                "data": response.json(),
-                "status_code": response.status_code,
-                "response_time": response.elapsed.total_seconds()
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        return await self.make_request("POST", f"{API_BASE_URL}/v1/competitions/{asin}/report:refresh")
     
     async def get_health(self) -> Dict[str, Any]:
         """Get system health."""
-        try:
-            response = await self.client.get(f"{API_BASE_URL}/health")
-            return {
-                "success": True,
-                "data": response.json(),
-                "status_code": response.status_code,
-                "response_time": response.elapsed.total_seconds()
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        return await self.make_request("GET", f"{API_BASE_URL}/health")
     
     async def graphql_query(self, query: str, variables: Dict[str, Any] = None) -> Dict[str, Any]:
         """Execute GraphQL query."""
-        try:
-            payload = {"query": query}
-            if variables:
-                payload["variables"] = variables
-                
-            response = await self.client.post(GRAPHQL_URL, json=payload)
-            return {
-                "success": True,
-                "data": response.json(),
-                "status_code": response.status_code,
-                "response_time": response.elapsed.total_seconds()
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
+        payload = {"query": query}
+        if variables:
+            payload["variables"] = variables
+        return await self.make_request("POST", GRAPHQL_URL, json=payload)
 
 # Global client instance
 api_client = DemoAPIClient()
@@ -455,7 +390,7 @@ async def demo_system_health():
         status_color = "green" if health_data.get("status") == "healthy" else "red"
         
         health_html = f"""
-        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; background-color: #f0f8f0;">
+        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; background-color: #374151;">
             <h3>🏥 System Health Status</h3>
             <p><strong>Overall Status:</strong> <span style="color: {status_color}">●</span> {health_data.get('status', 'unknown')}</p>
             <p><strong>Environment:</strong> {health_data.get('environment', 'N/A')}</p>
@@ -525,7 +460,7 @@ def create_demo_app():
                 gr.HTML("""
                 <div style="text-align: center; padding: 20px;">
                     <h2>System Architecture</h2>
-                    <div style="border: 2px solid #ddd; padding: 20px; border-radius: 10px; background-color: #fafafa;">
+                    <div style="border: 2px solid #ddd; padding: 20px; border-radius: 10px; background-color: #374151;">
                         <h3>🔄 Data Flow</h3>
                         <p><strong>Ingestion:</strong> Celery Workers → Apify APIs → PostgreSQL → Redis Cache</p>
                         <p><strong>API Layer:</strong> FastAPI (REST + GraphQL) → Cache-First Strategy → SWR Pattern</p>
@@ -544,11 +479,13 @@ def create_demo_app():
                 """)
                 
                 with gr.Row():
-                    health_btn = gr.Button("🔍 Check System Health", variant="primary", scale=1)
+                    health_btn = gr.Button("🔍 Check System Health", variant="primary")
                     
                 with gr.Row():
-                    health_response = gr.Textbox(label="API Response", lines=10, scale=2)
-                    health_status = gr.HTML(label="Health Status", scale=1)
+                    with gr.Column(scale=2):
+                        health_response = gr.Textbox(label="API Response", lines=10)
+                    with gr.Column(scale=1):
+                        health_status = gr.HTML(label="Health Status")
                 
                 health_btn.click(
                     fn=async_wrapper(demo_system_health),
@@ -582,8 +519,10 @@ def create_demo_app():
                         product_info = gr.HTML(label="Product Info")
                 
                 with gr.Row():
-                    metrics_response = gr.Textbox(label="Metrics API Response", lines=6, scale=1)
-                    metrics_chart = gr.Plot(label="Metrics Visualization", scale=2)
+                    with gr.Column(scale=1):
+                        metrics_response = gr.Textbox(label="Metrics API Response", lines=6)
+                    with gr.Column(scale=2):
+                        metrics_chart = gr.Plot(label="Metrics Visualization")
                 
                 # Batch processing demo
                 gr.HTML("<h3>🚀 Batch Processing Demo</h3>")
@@ -596,8 +535,10 @@ def create_demo_app():
                     batch_btn = gr.Button("Batch Request", variant="primary")
                 
                 with gr.Row():
-                    batch_response = gr.Textbox(label="Batch API Response", lines=8, scale=2)
-                    batch_performance = gr.HTML(label="Performance Stats", scale=1)
+                    with gr.Column(scale=2):
+                        batch_response = gr.Textbox(label="Batch API Response", lines=8)
+                    with gr.Column(scale=1):
+                        batch_performance = gr.HTML(label="Performance Stats")
                 
                 # Event handlers
                 get_product_btn.click(
@@ -652,8 +593,10 @@ def create_demo_app():
                     get_comp_btn = gr.Button("Get Competition Analysis", variant="secondary")
                 
                 with gr.Row():
-                    comp_response = gr.Textbox(label="Competition API Response", lines=6, scale=1)
-                    comp_chart = gr.Plot(label="Competitive Positioning", scale=2)
+                    with gr.Column(scale=1):
+                        comp_response = gr.Textbox(label="Competition API Response", lines=6)
+                    with gr.Column(scale=2):
+                        comp_chart = gr.Plot(label="Competitive Positioning")
                 
                 with gr.Row():
                     comp_table = gr.Dataframe(label="Competitor Comparison Table")
@@ -670,8 +613,10 @@ def create_demo_app():
                     refresh_report_btn = gr.Button("Refresh Report", variant="secondary")
                 
                 with gr.Row():
-                    report_response = gr.Textbox(label="Report API Response", lines=6, scale=1)
-                    report_display = gr.HTML(label="AI Analysis Report", scale=2)
+                    with gr.Column(scale=1):
+                        report_response = gr.Textbox(label="Report API Response", lines=6)
+                    with gr.Column(scale=2):
+                        report_display = gr.HTML(label="AI Analysis Report")
                 
                 # Event handlers
                 setup_comp_btn.click(
@@ -771,11 +716,7 @@ query GetLatestReport {{
                             }
                             return queries.get(query_name, "")
                         
-                        sample_queries.change(
-                            fn=load_sample_query,
-                            inputs=[sample_queries],
-                            outputs=[gr.Textbox()]
-                        )
+                        # We'll connect this to the main graphql_query textbox below
                     
                     with gr.Column(scale=2):
                         graphql_query = gr.Textbox(
