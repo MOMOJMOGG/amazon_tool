@@ -179,11 +179,17 @@ def create_competition_chart(data: Dict[str, Any]) -> go.Figure:
         fig = go.Figure()
         
         for peer in peers[:3]:  # Limit to first 3 competitors
+            # Handle None values safely
+            price_diff = peer.get("price_diff") or 0
+            bsr_gap = peer.get("bsr_gap") or 0
+            rating_diff = peer.get("rating_diff") or 0
+            reviews_gap = peer.get("reviews_gap") or 0
+            
             values = [
-                peer.get("price_diff", 0),
-                peer.get("bsr_gap", 0) / 1000,  # Scale BSR for visibility
-                peer.get("rating_diff", 0) * 10,  # Scale rating for visibility  
-                peer.get("reviews_gap", 0) / 100  # Scale reviews for visibility
+                price_diff,
+                bsr_gap / 1000,  # Scale BSR for visibility
+                rating_diff * 10,  # Scale rating for visibility  
+                reviews_gap / 100  # Scale reviews for visibility
             ]
             
             fig.add_trace(go.Scatterpolar(
@@ -374,13 +380,18 @@ No competition data found. This could be because:
         if peers:
             table_data = []
             for peer in peers:
+                # Handle None values properly for formatting
+                price_diff = peer.get('price_diff')
+                rating_diff = peer.get('rating_diff') 
+                buybox_diff = peer.get('buybox_diff')
+                
                 table_data.append({
                     "Competitor ASIN": peer.get("asin", "N/A"),
-                    "Price Difference": f"${peer.get('price_diff', 0):.2f}",
-                    "BSR Gap": peer.get("bsr_gap", 0),
-                    "Rating Difference": f"{peer.get('rating_diff', 0):.1f}",
-                    "Reviews Gap": peer.get("reviews_gap", 0),
-                    "Buybox Difference": f"${peer.get('buybox_diff', 0):.2f}"
+                    "Price Difference": f"${price_diff:.2f}" if price_diff is not None else "N/A",
+                    "BSR Gap": peer.get("bsr_gap", "N/A"),
+                    "Rating Difference": f"{rating_diff:.1f}" if rating_diff is not None else "N/A",
+                    "Reviews Gap": peer.get("reviews_gap", "N/A"),
+                    "Buybox Difference": f"${buybox_diff:.2f}" if buybox_diff is not None else "N/A"
                 })
             table_df = pd.DataFrame(table_data)
     
