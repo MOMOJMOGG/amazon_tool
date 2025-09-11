@@ -229,11 +229,12 @@ class CompetitorComparisonService:
         Returns list of comparison records.
         """
         cache_key = f"competition:{asin_main}:{days_back}d"
-        cached_data = await cache.get(cache_key)
+        # Temporarily bypass cache to isolate the issue
+        # cached_data = await cache.get(cache_key)
         
-        if cached_data:
-            logger.info(f"Returning cached competition data for {asin_main}")
-            return cached_data
+        # if cached_data:
+        #     logger.info(f"Returning cached competition data for {asin_main}")
+        #     return cached_data
         
         end_date = date.today()
         start_date = end_date - timedelta(days=days_back)
@@ -265,8 +266,8 @@ class CompetitorComparisonService:
                 'extras': comp.extras
             })
         
-        # Cache for 4 hours
-        await cache.set(cache_key, competition_data, ttl=14400)
+        # Cache for 4 hours - temporarily disabled
+        # await cache.set(cache_key, competition_data, ttl=14400)
         
         logger.info(f"Retrieved {len(competition_data)} competition records for {asin_main}")
         return competition_data
@@ -274,10 +275,11 @@ class CompetitorComparisonService:
     async def get_latest_peer_gaps(self, asin_main: str) -> List[Dict[str, Any]]:
         """Get the most recent competitor gaps for a main product."""
         cache_key = f"competition:latest:{asin_main}"
-        cached_data = await cache.get(cache_key)
+        # Temporarily bypass cache to isolate the issue
+        # cached_data = await cache.get(cache_key)
         
-        if cached_data:
-            return cached_data
+        # if cached_data:
+        #     return cached_data
         
         # Get latest date with comparison data
         async with get_db_session() as session:
@@ -313,8 +315,8 @@ class CompetitorComparisonService:
                 'buybox_diff': float(comp.buybox_diff) if comp.buybox_diff else None
             })
         
-        # Cache for 2 hours
-        await cache.set(cache_key, peer_gaps, ttl=7200)
+        # Cache for 2 hours - temporarily disabled
+        # await cache.set(cache_key, peer_gaps, ttl=7200)
         
         logger.info(f"Retrieved {len(peer_gaps)} latest peer gaps for {asin_main}")
         return peer_gaps

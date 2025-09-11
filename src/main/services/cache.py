@@ -5,20 +5,33 @@ import json
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional, Tuple, Callable
-import redis.asyncio as redis
-from redis.exceptions import RedisError
+
+# Handle Redis import gracefully - Redis might not be installed in test environments
+try:
+    import redis.asyncio as redis
+    from redis.exceptions import RedisError
+    REDIS_AVAILABLE = True
+except ImportError:
+    redis = None
+    RedisError = Exception
+    REDIS_AVAILABLE = False
 
 from src.main.config import settings
 
 logger = logging.getLogger(__name__)
 
 # Global Redis connection
-redis_client: Optional[redis.Redis] = None
+redis_client: Optional[Any] = None
 
 
 async def init_redis() -> None:
     """Initialize Redis connection."""
     global redis_client
+    
+    if not REDIS_AVAILABLE:
+        logger.warning("Redis module not available - cache service will work without Redis")
+        redis_client = None
+        return
     
     try:
         redis_client = redis.from_url(
