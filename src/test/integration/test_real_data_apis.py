@@ -98,7 +98,7 @@ class TestRealDataAPIs:
             await ac.delete(f"/v1/competitions/links/{self.REAL_MAIN_ASIN}")
             
             # Set up exactly 5 legitimate competitors from config file
-            legitimate_competitors = [RealTestData.ALTERNATIVE_TEST_ASINS[0], "B0CHYJT52D", "B0F9DM91VJ", "B0CG2Z78TL", RealTestData.PRIMARY_TEST_ASIN]
+            legitimate_competitors = [RealTestData.ALTERNATIVE_TEST_ASINS[0], "B0CHYJT52D", "B0F9DM91VJ", "B0CG2Z78TL", RealTestData.ALTERNATIVE_TEST_ASINS[1]]
             
             setup_response = await ac.post("/v1/competitions/setup", json={
                 "asin_main": self.REAL_MAIN_ASIN,
