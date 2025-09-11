@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     # Cache Configuration
     cache_ttl_seconds: int = 86400  # 24 hours
     cache_stale_seconds: int = 3600  # 1 hour
+    
+    # OpenAI Configuration (M5)
+    openai_api_key: Optional[str] = None
+    openai_model: str = "gpt-4"
+    openai_max_tokens: int = 2000
 
 
 # Global settings instance

@@ -61,6 +61,44 @@ app.include_router(metrics_router)
 app.include_router(etl_router)
 app.include_router(competitions_router)
 
+# Add GraphQL endpoint for M5
+try:
+    from strawberry.fastapi import GraphQLRouter
+    from src.main.graphql.schema import schema
+    from src.main.graphql.context import get_context
+    
+    # Create GraphQL router with context
+    graphql_app = GraphQLRouter(
+        schema, 
+        context_getter=get_context,
+        path="/graphql"
+    )
+    
+    # Include GraphQL router
+    app.include_router(graphql_app, prefix="/graphql", include_in_schema=False)
+    logger.info("GraphQL endpoint configured at /graphql")
+    
+    # Add schema endpoint for development
+    if settings.environment == "development":
+        @app.get("/graphql/schema")
+        async def get_graphql_schema():
+            """Get GraphQL schema SDL for development."""
+            return {"sdl": str(schema)}
+        
+        @app.get("/graphql/operations")
+        async def get_persisted_operations():
+            """Get list of persisted GraphQL operations for development."""
+            from src.main.graphql.schema import PERSISTED_QUERIES
+            return {
+                "operations": list(PERSISTED_QUERIES.keys()),
+                "total_operations": len(PERSISTED_QUERIES)
+            }
+    
+except ImportError as e:
+    logger.warning(f"Could not import GraphQL dependencies: {e}")
+except Exception as e:
+    logger.error(f"Error configuring GraphQL endpoint: {e}")
+
 
 @app.on_event("startup")
 async def startup_event():
