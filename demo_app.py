@@ -403,6 +403,34 @@ async def demo_get_report(asin: str):
         return "Please enter an ASIN", None
     
     result = await api_client.get_competition_report(asin)
+    
+    # Handle 404 - no report exists yet
+    if not result.get("success") and "404" in str(result.get("error", "")):
+        no_report_html = f"""
+        <div style="border: 1px solid #ffa500; padding: 20px; border-radius: 8px; background-color: #374151;">
+            <h3>📄 No Competition Report Available</h3>
+            <p><strong>ASIN:</strong> {asin}</p>
+            <p><strong>Status:</strong> No report has been generated yet</p>
+            
+            <h4>💡 To generate a report:</h4>
+            <ol>
+                <li><strong>Setup Competitors:</strong> First configure competitor relationships in the Competition Setup section</li>
+                <li><strong>Refresh Report:</strong> Click the "Refresh Report" button below to trigger AI report generation</li>
+                <li><strong>Wait for Processing:</strong> Report generation typically takes 2-5 seconds</li>
+                <li><strong>Retrieve Report:</strong> Click "Get AI Report" again to view the generated insights</li>
+            </ol>
+            
+            <p><strong>💡 Demo Tip:</strong> For video recording, use the "Refresh Report" button first, then "Get AI Report" to show the full workflow!</p>
+        </div>
+        """
+        formatted_response = f"""✅ **Status**: 404 | **Response Time**: {result.get('response_time', 0):.3f}s
+
+**This is expected!** No competition report exists yet for ASIN: {asin}
+
+Use the "Refresh Report" button to generate a new AI-powered analysis."""
+        
+        return formatted_response, no_report_html
+    
     formatted_response = format_json_response(result)
     
     # Format report for better display
@@ -442,7 +470,29 @@ async def demo_refresh_report(asin: str):
         return "Please enter an ASIN"
     
     result = await api_client.refresh_report(asin)
-    return format_json_response(result)
+    
+    # Enhance response with helpful guidance
+    if result.get("success"):
+        enhanced_response = f"""✅ **Report Generation Triggered Successfully**
+
+**ASIN:** {asin}
+**Status:** {result.get('status_code', 'N/A')} | **Response Time:** {result.get('response_time', 0):.3f}s
+
+**Next Steps:**
+1. ⏱️ **Wait 2-5 seconds** for AI analysis to complete
+2. 🔄 **Click "Get AI Report"** to retrieve the generated insights
+3. 📊 **Review** competitive analysis and recommendations
+
+**Demo Tip:** This demonstrates the async nature of AI report generation - perfect for showing real-world workflow!
+
+**Raw API Response:**
+```json
+{json.dumps(result.get('data', {}), indent=2, ensure_ascii=False)}
+```"""
+        return enhanced_response
+    else:
+        # Handle errors gracefully
+        return format_json_response(result)
 
 async def demo_system_health():
     """Demo: System health check."""
