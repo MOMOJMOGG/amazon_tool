@@ -48,9 +48,9 @@ class ReportGenerationService:
     """Service for generating LLM-powered competition reports."""
     
     def __init__(self):
-        self.openai_client = openai.AsyncOpenAI(
-            api_key=getattr(settings, 'openai_api_key', None)
-        )
+        # Initialize OpenAI client only if API key is available
+        api_key = getattr(settings, 'openai_api_key', None)
+        self.openai_client = openai.AsyncOpenAI(api_key=api_key) if api_key else None
         self.model = getattr(settings, 'openai_model', 'gpt-4')
         self.max_tokens = getattr(settings, 'openai_max_tokens', 2000)
     
@@ -186,8 +186,8 @@ class ReportGenerationService:
     ) -> Optional[CompetitionReportSummary]:
         """Generate report using OpenAI API."""
         try:
-            if not hasattr(settings, 'openai_api_key') or not settings.openai_api_key:
-                logger.error("OpenAI API key not configured")
+            if not self.openai_client:
+                logger.error("OpenAI client not available - API key not configured")
                 return None
             
             # Prepare prompt with evidence data

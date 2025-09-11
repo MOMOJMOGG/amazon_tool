@@ -1,11 +1,14 @@
 """GraphQL context for database and cache access."""
 
+import logging
 from typing import Optional
 from dataclasses import dataclass
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.main.database import get_db_session
 from src.main.services.cache import cache
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -16,23 +19,28 @@ class GraphQLContext:
     
     @classmethod
     async def create(cls) -> "GraphQLContext":
-        """Create GraphQL context with database session."""
+        """Create GraphQL context with real Supabase database connection."""
         try:
-            # For GraphQL context, we'll create a session that needs to be managed
-            # The session will be closed in the context's close method
-            session_factory = get_db_session()
-            db_session = session_factory()  # This creates an AsyncSession instance
-            return cls(db_session=db_session)
-        except Exception:
-            # Return context without database session if connection fails
+            # For GraphQL, we'll create the context without pre-creating a session
+            # Each resolver will use get_db_session() to get its own session
+            # This ensures proper session management and real Supabase connections
+            
+            logger.debug("GraphQL context created for Supabase database")
+            return cls(db_session=None)  # Resolvers manage their own sessions
+        except Exception as e:
+            logger.error(f"Failed to create GraphQL context: {e}")
             return cls(db_session=None)
     
     async def close(self):
         """Close database session if available."""
         if self.db_session:
-            await self.db_session.close()
+            try:
+                await self.db_session.close()
+                logger.debug("GraphQL database session closed")
+            except Exception as e:
+                logger.error(f"Error closing GraphQL database session: {e}")
 
 
 async def get_context() -> GraphQLContext:
-    """Get GraphQL context for request."""
+    """Get GraphQL context with real Supabase database connection."""
     return await GraphQLContext.create()

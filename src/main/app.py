@@ -116,31 +116,41 @@ app.include_router(competitions_router)
 
 # Add GraphQL endpoint for M5
 try:
-    import strawberry
     from strawberry.fastapi import GraphQLRouter
+    from src.main.graphql.schema import schema, PERSISTED_QUERIES
     
-    # Test basic strawberry functionality
-    @strawberry.type
-    class TestQuery:
-        @strawberry.field
-        def hello(self) -> str:
-            return "Hello from GraphQL!"
-    
-    test_schema = strawberry.Schema(query=TestQuery)
-    
-    # Create simple GraphQL router for testing
-    graphql_app = GraphQLRouter(test_schema)
+    # Create GraphQL router with full M5 schema
+    graphql_app = GraphQLRouter(
+        schema,
+        context_getter=lambda: None  # Context will be handled in resolvers
+    )
     
     # Include GraphQL router
     app.include_router(graphql_app, prefix="/graphql", include_in_schema=False)
-    logger.info("GraphQL endpoint configured at /graphql (test mode)")
+    logger.info("GraphQL endpoint configured at /graphql with full M5 schema")
     
-    # Add schema endpoint for development
+    # Add schema and operations endpoints for development
     if settings.environment == "development":
         @app.get("/graphql/schema")
         async def get_graphql_schema():
             """Get GraphQL schema SDL for development."""
-            return {"sdl": str(test_schema)}
+            return {"sdl": str(schema)}
+        
+        @app.get("/graphql/operations")
+        async def get_persisted_operations():
+            """Get available persisted operations."""
+            operations = [
+                {
+                    "hash": query_hash,
+                    "query": query_string.strip(),
+                    "name": f"Operation_{i+1}"
+                }
+                for i, (query_hash, query_string) in enumerate(PERSISTED_QUERIES.items())
+            ]
+            return {
+                "operations": operations,
+                "total_operations": len(operations)
+            }
     
 except ImportError as e:
     logger.warning(f"Could not import GraphQL dependencies: {e}")

@@ -376,8 +376,8 @@ class TestReportDataQuality:
     """Test report generation data quality and validation."""
     
     @pytest.mark.asyncio
-    async def test_evidence_data_gathering(self):
-        """Test that evidence data is properly gathered from real database."""
+    async def test_evidence_data_gathering_real_supabase(self):
+        """Test that evidence data is properly gathered from real Supabase database."""
         from src.main.database import init_db
         from src.main.services.reports import report_service
         
@@ -385,19 +385,33 @@ class TestReportDataQuality:
         
         test_asin = "B0FDKB341G"
         
-        # Test evidence gathering (this uses real database queries)
+        # Test evidence gathering using real Supabase queries
         evidence = await report_service.get_evidence_data(test_asin, 30)
         
         if evidence:
-            # Validate evidence structure
+            # Validate evidence structure with real data
             assert evidence.main_asin == test_asin
             assert evidence.time_range_days == 30
             assert 0.0 <= evidence.data_completeness <= 1.0
             assert isinstance(evidence.main_product_data, dict)
             assert isinstance(evidence.competitor_data, list)
             assert isinstance(evidence.market_analysis, dict)
+            
+            # Verify main product data structure
+            assert 'product_info' in evidence.main_product_data
+            assert 'metrics' in evidence.main_product_data
+            
+            # Log real data for debugging
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"Real evidence gathered from Supabase - "
+                       f"competitors: {len(evidence.competitor_data)}, "
+                       f"completeness: {evidence.data_completeness:.2%}")
         else:
-            # No evidence available - this is acceptable if no data exists
+            # No evidence available - acceptable if no real data exists in Supabase
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"No evidence data found in Supabase for ASIN {test_asin}")
             assert evidence is None
     
     @pytest.mark.asyncio
