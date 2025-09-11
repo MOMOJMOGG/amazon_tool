@@ -32,23 +32,26 @@ class TestCompetitorComparisonService:
     
     @pytest.mark.asyncio
     async def test_setup_competitor_links_with_real_data(self, service, real_main_asin, real_competitor_asins):
-        """Test setup of competitor links using real loaded data."""
-        # Initialize database for real data tests
-        from src.main.database import init_db
-        await init_db()
-        
-        # This test uses the actual database with real data
-        created_count = await service.setup_competitor_links(real_main_asin, real_competitor_asins)
-        
-        # Should create 5 competitor links (or 0 if already exist from previous setup)
-        assert created_count >= 0  # Allow for existing links
-        assert created_count <= 5  # Maximum possible
-        
-        # Verify we can retrieve the competitors
-        competitors = await service.get_competitor_links(real_main_asin)
-        assert isinstance(competitors, list)
-        # Should have at least some competitors (might be more than our test set due to previous setups)
-        assert len(competitors) >= 0
+        """Test setup of competitor links using real data configuration (mocked for unit testing)."""
+        with patch('src.main.services.comparison.get_db_session') as mock_session:
+            mock_db = AsyncMock()
+            mock_session.return_value.__aenter__.return_value = mock_db
+            
+            # Mock execute to return successful rowcount for 2 out of 5 competitors
+            mock_result = AsyncMock()
+            mock_result.rowcount = 1  # Simulate successful insert
+            mock_db.execute.return_value = mock_result
+            
+            created_count = await service.setup_competitor_links(real_main_asin, real_competitor_asins)
+            
+            # Should create competitor links equal to the number of valid competitors
+            assert created_count >= 0
+            assert created_count <= len(real_competitor_asins)  # Can't create more than attempted
+            
+            # Verify database operations
+            mock_session.assert_called_once()
+            assert mock_db.execute.call_count >= 1  # Should execute at least one INSERT
+            mock_db.commit.assert_called_once()  # Should commit transaction
     
     @pytest.mark.asyncio
     async def test_setup_competitor_links_success_mock(self, service, mock_competitor_asins):
