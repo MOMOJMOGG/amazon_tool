@@ -70,8 +70,7 @@ try:
     # Create GraphQL router with context
     graphql_app = GraphQLRouter(
         schema, 
-        context_getter=get_context,
-        path="/graphql"
+        context_getter=get_context
     )
     
     # Include GraphQL router
