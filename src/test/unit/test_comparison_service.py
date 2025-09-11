@@ -236,7 +236,7 @@ class TestCompetitorComparisonService:
             mock_link1.asin_comp = "B08N5WRWNW"
             
             mock_links_result = MagicMock()
-            mock_links_result.fetchall.return_value = [mock_link1]
+            mock_links_result.scalars.return_value.all.return_value = [mock_link1]
             
             mock_results = [
                 mock_links_result,  # Links query
@@ -277,7 +277,7 @@ class TestCompetitorComparisonService:
             mock_comparison.extras = {}
             
             mock_result = MagicMock()
-            mock_result.fetchall.return_value = [mock_comparison]
+            mock_result.scalars.return_value.all.return_value = [mock_comparison]
             mock_db.execute = AsyncMock(return_value=mock_result)
             
             data = await service.get_competition_data(main_asin, days_back)
@@ -300,7 +300,7 @@ class TestCompetitorComparisonService:
             
             # Mock empty query result (no comparison data)
             mock_result = MagicMock()
-            mock_result.fetchall.return_value = []
+            mock_result.scalars.return_value.all.return_value = []
             mock_db.execute = AsyncMock(return_value=mock_result)
             
             data = await service.get_competition_data(main_asin, days_back)
@@ -325,7 +325,7 @@ class TestCompetitorComparisonService:
             
             # Mock empty result
             mock_result = MagicMock()
-            mock_result.fetchall.return_value = []
+            mock_result.scalars.return_value.all.return_value = []
             mock_db.execute = AsyncMock(return_value=mock_result)
             
             data = await service.get_competition_data(main_asin, days_back)
