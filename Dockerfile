@@ -45,8 +45,9 @@ WORKDIR /app
 
 # Copy application code
 COPY src/ ./src/
-COPY alembic/ ./alembic/
-COPY alembic.ini .
+
+# Copy alembic files if they exist
+COPY alembic* ./
 COPY .env.example .env
 
 # Create necessary directories and set permissions
