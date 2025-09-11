@@ -1,0 +1,162 @@
+version: '3.8'
+
+# Development overrides for docker-compose.yml
+# Usage: docker-compose up (automatically includes overrides)
+# Or explicitly: docker-compose -f docker-compose.yml -f docker-compose.override.yml up
+
+services:
+  # Development API with hot reload
+  api:
+    build:
+      target: development
+    ports:
+      - "8000:8000"  # Expose port directly for development
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres-dev:5432/amazon_tool_dev}
+      - REDIS_URL=redis://redis-dev:6379
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+    volumes:
+      # Mount source code for hot reload
+      - ./src:/app/src:ro
+      - ./alembic:/app/alembic:ro
+      - ./alembic.ini:/app/alembic.ini:ro
+      - ./.env:/app/.env:ro
+    depends_on:
+      redis-dev:
+        condition: service_healthy
+      postgres-dev:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Waiting for database to be ready...' &&
+        sleep 5 &&
+        echo 'Running database migrations...' &&
+        alembic upgrade head &&
+        echo 'Starting development server...' &&
+        uvicorn src.main.app:app --host 0.0.0.0 --port 8000 --reload --log-level debug
+      "
+
+  # Development Celery worker
+  worker:
+    build:
+      target: development
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres-dev:5432/amazon_tool_dev}
+      - REDIS_URL=redis://redis-dev:6379
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - C_FORCE_ROOT=1
+    volumes:
+      - ./src:/app/src:ro
+    depends_on:
+      redis-dev:
+        condition: service_healthy
+      postgres-dev:
+        condition: service_healthy
+    command: celery -A src.main.tasks worker --loglevel=DEBUG --concurrency=2 --pool=solo
+
+  # Development Celery scheduler
+  scheduler:
+    build:
+      target: development
+    environment:
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:postgres@postgres-dev:5432/amazon_tool_dev}
+      - REDIS_URL=redis://redis-dev:6379
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - C_FORCE_ROOT=1
+    volumes:
+      - ./src:/app/src:ro
+    depends_on:
+      redis-dev:
+        condition: service_healthy
+      postgres-dev:
+        condition: service_healthy
+
+  # Development Redis
+  redis-dev:
+    image: redis:7-alpine
+    container_name: amazon_tool_redis_dev
+    ports:
+      - "6379:6379"  # Expose port for external access
+    volumes:
+      - redis_dev_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Development PostgreSQL
+  postgres-dev:
+    image: postgres:15-alpine
+    container_name: amazon_tool_postgres_dev
+    ports:
+      - "5432:5432"  # Expose port for external access
+    environment:
+      - POSTGRES_DB=amazon_tool_dev
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+      - ./tools/database:/docker-entrypoint-initdb.d:ro
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Grafana with development settings
+  grafana:
+    ports:
+      - "3000:3000"  # Expose port directly
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
+      - GF_SERVER_ROOT_URL=http://localhost:3000/
+      - GF_SERVER_SERVE_FROM_SUB_PATH=false
+      - GF_LOG_LEVEL=debug
+
+  # Prometheus with development settings
+  prometheus:
+    ports:
+      - "9090:9090"  # Expose port directly
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=7d'  # Shorter retention for dev
+      - '--web.enable-lifecycle'
+      - '--log.level=debug'
+
+  # Nginx with development proxy settings
+  nginx:
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.dev.conf:/etc/nginx/nginx.conf:ro
+    environment:
+      - NGINX_ENVSUBST_TEMPLATE_SUFFIX=.template
+      - API_HOST=api
+      - API_PORT=8000
+      - GRAFANA_HOST=grafana
+      - GRAFANA_PORT=3000
+
+# Additional volumes for development
+volumes:
+  postgres_dev_data:
+    name: amazon_tool_postgres_dev_data
+  redis_dev_data:
+    name: amazon_tool_redis_dev_data

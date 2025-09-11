@@ -1,0 +1,159 @@
+# Prometheus Alert Rules for Amazon Product Monitoring Tool
+# Define alerts for system health and business metrics
+
+groups:
+  - name: system_health
+    rules:
+      # API Health Alerts
+      - alert: APIHighErrorRate
+        expr: rate(http_requests_total{job="amazon-tool-api",status=~"5.."}[5m]) / rate(http_requests_total{job="amazon-tool-api"}[5m]) * 100 > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "High API error rate detected"
+          description: "API error rate is {{ $value }}% for the last 5 minutes"
+
+      - alert: APIVeryHighErrorRate
+        expr: rate(http_requests_total{job="amazon-tool-api",status=~"5.."}[5m]) / rate(http_requests_total{job="amazon-tool-api"}[5m]) * 100 > 15
+        for: 1m
+        labels:
+          severity: critical
+          service: api
+        annotations:
+          summary: "Critical API error rate detected"
+          description: "API error rate is {{ $value }}% for the last 5 minutes"
+
+      # Response Time Alerts
+      - alert: APIHighResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="amazon-tool-api"}[5m])) > 2
+        for: 3m
+        labels:
+          severity: warning
+          service: api
+        annotations:
+          summary: "High API response times"
+          description: "95th percentile response time is {{ $value }}s"
+
+      # Redis Alerts
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: redis
+        annotations:
+          summary: "Redis is down"
+          description: "Redis service is not responding"
+
+      - alert: RedisLowCacheHitRate
+        expr: redis_keyspace_hits_total / (redis_keyspace_hits_total + redis_keyspace_misses_total) * 100 < 80
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+        annotations:
+          summary: "Low Redis cache hit rate"
+          description: "Cache hit rate is {{ $value }}%"
+
+      # Database Alerts
+      - alert: PostgreSQLDown
+        expr: up{job="postgres"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: postgres
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL service is not responding"
+
+      # Celery Worker Alerts
+      - alert: CeleryWorkerDown
+        expr: up{job="amazon-tool-worker"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: worker
+        annotations:
+          summary: "Celery worker is down"
+          description: "Celery worker service is not responding"
+
+      - alert: CeleryTaskQueueBacklog
+        expr: celery_tasks_pending > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: worker
+        annotations:
+          summary: "Celery task queue backlog"
+          description: "{{ $value }} tasks pending in the queue"
+
+  - name: business_metrics
+    rules:
+      # Data Freshness Alerts
+      - alert: DataStaleness
+        expr: time() - amazon_tool_last_etl_run_timestamp > 86400
+        for: 1m
+        labels:
+          severity: warning
+          service: etl
+        annotations:
+          summary: "Data is stale"
+          description: "No ETL pipeline run for more than 24 hours"
+
+      # ETL Pipeline Alerts
+      - alert: ETLPipelineFailure
+        expr: increase(amazon_tool_etl_failures_total[1h]) > 3
+        for: 1m
+        labels:
+          severity: critical
+          service: etl
+        annotations:
+          summary: "ETL pipeline failures"
+          description: "{{ $value }} ETL pipeline failures in the last hour"
+
+      # Data Quality Alerts
+      - alert: LowDataCompleteness
+        expr: amazon_tool_data_completeness_percent < 40
+        for: 10m
+        labels:
+          severity: warning
+          service: etl
+        annotations:
+          summary: "Low data completeness"
+          description: "Data completeness is {{ $value }}%"
+
+      # Competition Analysis Alerts
+      - alert: CompetitorAnalysisFailure
+        expr: increase(amazon_tool_competitor_analysis_failures_total[6h]) > 5
+        for: 1m
+        labels:
+          severity: warning
+          service: analysis
+        annotations:
+          summary: "Competitor analysis failures"
+          description: "{{ $value }} competitor analysis failures in the last 6 hours"
+
+  - name: cost_monitoring
+    rules:
+      # External API Cost Alerts
+      - alert: HighOpenAICosts
+        expr: increase(amazon_tool_openai_api_costs_total[24h]) > 50
+        for: 1m
+        labels:
+          severity: warning
+          service: openai
+        annotations:
+          summary: "High OpenAI API costs"
+          description: "OpenAI API costs exceeded ${{ $value }} in the last 24 hours"
+
+      - alert: HighApifyCosts
+        expr: increase(amazon_tool_apify_api_costs_total[24h]) > 100
+        for: 1m
+        labels:
+          severity: warning
+          service: apify
+        annotations:
+          summary: "High Apify API costs"
+          description: "Apify API costs exceeded ${{ $value }} in the last 24 hours"

@@ -1,0 +1,35 @@
+# Grafana Datasource Configuration
+# Automatically provision Prometheus as the primary datasource
+
+apiVersion: 1
+
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    orgId: 1
+    uid: prometheus
+    url: http://prometheus:9090
+    basicAuth: false
+    isDefault: true
+    version: 1
+    editable: true
+    jsonData:
+      httpMethod: POST
+      keepCookies: []
+      timeInterval: "15s"
+      queryTimeout: "60s"
+      defaultRegion: "default"
+      customQueryParameters: ""
+      manageAlerts: true
+      alertmanagerUid: ""
+      prometheusType: "Prometheus"
+      prometheusVersion: "2.40.0"
+      cacheLevel: "High"
+      disableMetricsLookup: false
+      incrementalQuerying: true
+      exemplarTraceIdDestinations: []

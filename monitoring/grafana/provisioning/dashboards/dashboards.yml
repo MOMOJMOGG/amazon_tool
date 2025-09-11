@@ -1,0 +1,38 @@
+# Grafana Dashboard Provisioning Configuration
+# Automatically load dashboards from the dashboards directory
+
+apiVersion: 1
+
+providers:
+  - name: 'Amazon Product Monitor Dashboards'
+    orgId: 1
+    folder: 'Amazon Product Monitor'
+    folderUid: 'amazon_product_monitor'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+
+  - name: 'System Dashboards'
+    orgId: 1
+    folder: 'System'
+    folderUid: 'system'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/system
+
+  - name: 'Business Dashboards'
+    orgId: 1
+    folder: 'Business Intelligence'
+    folderUid: 'business'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/business

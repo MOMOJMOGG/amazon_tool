@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amazon Product Monitor API - Documentation</title>
+  <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5.10.3/swagger-ui.css" />
+  <link rel="icon" type="image/png" href="./assets/favicon-32x32.png" sizes="32x32" />
+  <link rel="icon" type="image/png" href="./assets/favicon-16x16.png" sizes="16x16" />
+  <style>
+    html {
+      box-sizing: border-box;
+      overflow: -moz-scrollbars-vertical;
+      overflow-y: scroll;
+    }
+
+    *,
+    *:before,
+    *:after {
+      box-sizing: inherit;
+    }
+
+    body {
+      margin: 0;
+      background: #fafafa;
+    }
+
+    /* Custom branding */
+    .topbar {
+      background-color: #232F3E !important;
+      border-bottom: 3px solid #FF9900 !important;
+    }
+
+    .topbar-wrapper .link img {
+      content: url('./assets/logo.png');
+      height: 40px;
+      width: auto;
+    }
+
+    .topbar-wrapper .link {
+      color: white !important;
+      font-weight: bold;
+      font-size: 1.2em;
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .topbar-wrapper .link:after {
+      content: "Amazon Product Monitor API";
+      color: white;
+    }
+
+    /* Custom styling for API sections */
+    .opblock.opblock-get .opblock-summary {
+      border-color: #61affe;
+    }
+
+    .opblock.opblock-post .opblock-summary {
+      border-color: #49cc90;
+    }
+
+    .opblock.opblock-put .opblock-summary {
+      border-color: #fca130;
+    }
+
+    .opblock.opblock-delete .opblock-summary {
+      border-color: #f93e3e;
+    }
+
+    /* Environment selector styling */
+    .environment-selector {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: white;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      border: 1px solid #ddd;
+    }
+
+    .environment-selector select {
+      padding: 5px 10px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+      font-size: 14px;
+    }
+
+    /* Info section customization */
+    .info .title {
+      color: #232F3E;
+      font-size: 2.5em;
+    }
+
+    .info .description {
+      font-size: 1.1em;
+      line-height: 1.6;
+      color: #555;
+    }
+
+    /* Version badge */
+    .info .version {
+      background-color: #FF9900;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 20px;
+      font-weight: bold;
+    }
+
+    /* Server selection styling */
+    .servers select {
+      background-color: #f8f9fa;
+      border: 2px solid #FF9900;
+      border-radius: 5px;
+      padding: 10px;
+      font-size: 16px;
+      color: #232F3E;
+    }
+
+    /* Authentication section styling */
+    .auth-wrapper {
+      background-color: #fff3cd;
+      border: 1px solid #ffeaa7;
+      border-radius: 5px;
+      margin: 20px 0;
+      padding: 15px;
+    }
+
+    /* Response section styling */
+    .responses-inner h4 {
+      color: #232F3E;
+      font-weight: bold;
+    }
+
+    /* Custom footer */
+    .swagger-ui-footer {
+      text-align: center;
+      padding: 20px;
+      background-color: #232F3E;
+      color: white;
+      margin-top: 40px;
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Environment Selector -->
+  <div class="environment-selector">
+    <label for="env-select">Environment:</label>
+    <select id="env-select" onchange="changeEnvironment()">
+      <option value="production">Production</option>
+      <option value="staging">Staging</option>
+      <option value="development">Development</option>
+      <option value="local">Local</option>
+    </select>
+  </div>
+
+  <div id="swagger-ui"></div>
+
+  <!-- Custom Footer -->
+  <div class="swagger-ui-footer">
+    <p>© 2025 Amazon Product Monitor API | Built with FastAPI, Celery, and GraphQL</p>
+    <p>🚀 M6 Production Deployment | 📊 Monitoring: <a href="/grafana" style="color: #FF9900;">Grafana Dashboards</a></p>
+  </div>
+
+  <script src="https://unpkg.com/swagger-ui-dist@5.10.3/swagger-ui-bundle.js" charset="UTF-8"> </script>
+  <script src="https://unpkg.com/swagger-ui-dist@5.10.3/swagger-ui-standalone-preset.js" charset="UTF-8"> </script>
+  <script src="./config.js"></script>
+  
+  <script>
+    // Environment configuration
+    const environments = {
+      production: {
+        url: "/openapi.json",
+        description: "Production API - Amazon Product Monitor"
+      },
+      staging: {
+        url: "https://staging.amazonmonitor.com/openapi.json",
+        description: "Staging API - Amazon Product Monitor"
+      },
+      development: {
+        url: "https://dev.amazonmonitor.com/openapi.json", 
+        description: "Development API - Amazon Product Monitor"
+      },
+      local: {
+        url: "http://localhost:8000/openapi.json",
+        description: "Local Development API"
+      }
+    };
+
+    let currentEnv = 'production';
+
+    // Initialize Swagger UI
+    function initSwaggerUI(specUrl, description) {
+      window.ui = SwaggerUIBundle({
+        url: specUrl,
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        plugins: [
+          SwaggerUIBundle.plugins.DownloadUrl
+        ],
+        layout: "StandaloneLayout",
+        validatorUrl: null,
+        tryItOutEnabled: true,
+        requestInterceptor: (request) => {
+          // Add custom headers or authentication
+          console.log('Request interceptor:', request);
+          return request;
+        },
+        responseInterceptor: (response) => {
+          // Handle responses
+          console.log('Response interceptor:', response);
+          return response;
+        },
+        onComplete: () => {
+          console.log('SwaggerUI loaded successfully');
+          // Add custom completion logic
+        },
+        onFailure: (error) => {
+          console.error('SwaggerUI failed to load:', error);
+        },
+        docExpansion: "list", // none, list, or full
+        defaultModelsExpandDepth: 2,
+        defaultModelExpandDepth: 2,
+        displayOperationId: false,
+        displayRequestDuration: true,
+        filter: true, // Enable filtering
+        showExtensions: true,
+        showCommonExtensions: true,
+        supportedSubmitMethods: ['get', 'put', 'post', 'delete', 'options', 'head', 'patch'],
+        // Custom configuration
+        customSiteTitle: description,
+        customfavIcon: './assets/favicon-32x32.png',
+        customCss: `
+          .swagger-ui .topbar { display: flex; }
+          .swagger-ui .info { margin: 40px 0; }
+          .swagger-ui .scheme-container { 
+            background: #fff3cd; 
+            border: 1px solid #ffeaa7; 
+            border-radius: 5px; 
+            margin: 20px 0; 
+            padding: 15px; 
+          }
+        `
+      });
+    }
+
+    // Environment switcher
+    function changeEnvironment() {
+      const select = document.getElementById('env-select');
+      currentEnv = select.value;
+      const config = environments[currentEnv];
+      
+      console.log(`Switching to ${currentEnv} environment`);
+      initSwaggerUI(config.url, config.description);
+    }
+
+    // Initialize with production environment
+    document.addEventListener('DOMContentLoaded', () => {
+      const config = environments[currentEnv];
+      initSwaggerUI(config.url, config.description);
+    });
+
+    // JWT Token management (if needed)
+    function setAuthToken(token) {
+      window.ui.authActions.authorize({
+        BearerAuth: {
+          name: "BearerAuth",
+          schema: {
+            type: "http",
+            scheme: "bearer",
+            bearerFormat: "JWT"
+          },
+          value: token
+        }
+      });
+    }
+
+    // Utility functions for demo
+    function showDemoData() {
+      console.log('Loading demo data...');
+      // Add demo data loading logic
+    }
+
+    function exportOpenAPISpec() {
+      const spec = window.ui.getSystem().getState().get("json");
+      const blob = new Blob([JSON.stringify(spec, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `amazon-monitor-api-${currentEnv}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+  </script>
+</body>
+</html>
