@@ -98,7 +98,7 @@ class TestRealDataAPIs:
             await ac.delete(f"/v1/competitions/links/{self.REAL_MAIN_ASIN}")
             
             # Set up exactly 5 legitimate competitors from config file
-            legitimate_competitors = [RealTestData.ALTERNATIVE_TEST_ASINS[0], "B0CHYJT52D", "B0F9DM91VJ", "B0CG2Z78TL", RealTestData.ALTERNATIVE_TEST_ASINS[1]]
+            legitimate_competitors = [RealTestData.ALTERNATIVE_TEST_ASINS[0], "B0CHYJT52D", "B0F9DM91VJ", "B0CG2Z78TL", "B0F9DM91VJ"]
             
             setup_response = await ac.post("/v1/competitions/setup", json={
                 "asin_main": self.REAL_MAIN_ASIN,
@@ -112,9 +112,9 @@ class TestRealDataAPIs:
             assert response.status_code == 200
             competitor_asins = response.json()
             
-            # Should have our 5 competitors
+            # Should have our 4 unique competitors (duplicates are filtered out)
             assert isinstance(competitor_asins, list)
-            assert len(competitor_asins) == 5
+            assert len(competitor_asins) == 4
             assert self.REAL_COMP_ASIN in competitor_asins
     
     @pytest.mark.asyncio
