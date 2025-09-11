@@ -5,6 +5,7 @@ from httpx import AsyncClient
 from unittest.mock import patch
 
 from src.main.app import app
+from src.test.fixtures.real_test_data import RealTestData, get_test_asin
 
 
 class TestBatchProductsEndpoint:
@@ -20,7 +21,7 @@ class TestBatchProductsEndpoint:
         async with AsyncClient(app=app, base_url="http://test") as ac:
             # Test with valid ASINs from our test data
             request_data = {
-                "asins": ["B0FDKB341G", "B0F6BJSTSQ", "INVALID999"]  # Mix of valid and invalid
+                "asins": [RealTestData.PRIMARY_TEST_ASIN, RealTestData.ALTERNATIVE_TEST_ASINS[0], "INVALID999"]  # Mix of valid and invalid
             }
             
             response = await ac.post("/v1/products/batch", json=request_data)
@@ -76,7 +77,7 @@ class TestBatchProductsEndpoint:
         await init_db()
         
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            request_data = {"asins": ["B0FDKB341G"]}
+            request_data = {"asins": [RealTestData.PRIMARY_TEST_ASIN]}
             
             # First request - should hit database
             response1 = await ac.post("/v1/products/batch", json=request_data)
@@ -100,7 +101,7 @@ class TestBatchProductsEndpoint:
         
         async with AsyncClient(app=app, base_url="http://test") as ac:
             # Test with larger batch to verify performance
-            asins = ["B0FDKB341G", "B0F6BJSTSQ", "B09JVCL7JR", "B0FDK6TTSG", "B0FDK6L4K6"]
+            asins = [RealTestData.PRIMARY_TEST_ASIN] + RealTestData.ALTERNATIVE_TEST_ASINS[:4]
             request_data = {"asins": asins}
             
             import time
@@ -121,7 +122,7 @@ class TestBatchProductsEndpoint:
     async def test_batch_endpoint_metrics_headers(self):
         """Test that batch endpoint includes proper headers and metrics."""
         async with AsyncClient(app=app, base_url="http://test") as ac:
-            request_data = {"asins": ["B0FDKB341G"]}
+            request_data = {"asins": [RealTestData.PRIMARY_TEST_ASIN]}
             
             response = await ac.post("/v1/products/batch", json=request_data)
             
@@ -158,7 +159,7 @@ class TestBatchProductsEndpoint:
             mock_cache_get.return_value = None  # Cache miss
             
             async with AsyncClient(app=app, base_url="http://test") as ac:
-                request_data = {"asins": ["B0FDKB341G"]}
+                request_data = {"asins": [RealTestData.PRIMARY_TEST_ASIN]}
                 
                 response = await ac.post("/v1/products/batch", json=request_data)
                 

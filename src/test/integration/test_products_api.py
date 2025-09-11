@@ -7,6 +7,7 @@ import json
 from datetime import datetime
 
 from src.main.app import app
+from src.test.fixtures.real_test_data import RealTestData, get_test_asin
 
 
 class TestProductsAPI:
@@ -100,18 +101,18 @@ class TestProductsAPI:
                 # Mock cache miss
                 mock_cache.return_value = (sample_product_data, False, None)
                 
-                response = await ac.get("/v1/products/B08N5WRWNW")
+                response = await ac.get(f"/v1/products/{RealTestData.PRIMARY_TEST_ASIN}")
                 
                 assert response.status_code == 200
                 data = response.json()
                 
-                assert data["data"]["asin"] == "B08N5WRWNW"
+                assert data["data"]["asin"] == "RealTestData.PRIMARY_TEST_ASIN"
                 assert data["data"]["title"] == sample_product_data["title"]
                 assert data["cached"] is False
                 assert data["stale_at"] is None
                 
                 # Verify metrics were recorded
-                mock_record_product.assert_called_once_with("B08N5WRWNW", False)
+                mock_record_product.assert_called_once_with("RealTestData.PRIMARY_TEST_ASIN", False)
                 mock_record_cache.assert_called_once_with("get", "miss")
     
     @pytest.mark.asyncio
@@ -127,17 +128,17 @@ class TestProductsAPI:
                 # Mock cache hit
                 mock_cache.return_value = (sample_product_data, True, stale_at)
                 
-                response = await ac.get("/v1/products/B08N5WRWNW")
+                response = await ac.get(f"/v1/products/{RealTestData.PRIMARY_TEST_ASIN}")
                 
                 assert response.status_code == 200
                 data = response.json()
                 
-                assert data["data"]["asin"] == "B08N5WRWNW"
+                assert data["data"]["asin"] == "RealTestData.PRIMARY_TEST_ASIN"
                 assert data["cached"] is True
                 assert data["stale_at"] is not None
                 
                 # Verify metrics were recorded
-                mock_record_product.assert_called_once_with("B08N5WRWNW", True)
+                mock_record_product.assert_called_once_with("RealTestData.PRIMARY_TEST_ASIN", True)
                 mock_record_cache.assert_called_once_with("get", "hit")
     
     @pytest.mark.asyncio

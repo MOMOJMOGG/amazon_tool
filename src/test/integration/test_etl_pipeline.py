@@ -8,6 +8,7 @@ import json
 
 from src.main.app import app
 from src.main.models.staging import RawProductEventCreate
+from src.test.fixtures.real_test_data import RealTestData, get_test_asin
 
 
 class TestETLPipeline:
@@ -18,13 +19,13 @@ class TestETLPipeline:
         """Sample raw events for ETL testing."""
         return [
             {
-                "asin": "B08N5WRWNW",
+                "asin": RealTestData.PRIMARY_TEST_ASIN,
                 "source": "test_integration",
                 "event_type": "product_update",
                 "raw_data": {
-                    "asin": "B08N5WRWNW",
-                    "title": "Echo Dot (4th Gen) | Smart speaker with Alexa",
-                    "brand": "Amazon",
+                    "asin": RealTestData.PRIMARY_TEST_ASIN,
+                    "title": RealTestData.PRIMARY_PRODUCT_TITLE,
+                    "brand": RealTestData.PRIMARY_PRODUCT_BRAND,
                     "category": "Electronics",
                     "image_url": "https://example.com/echo-dot.jpg",
                     "price": 49.99,
@@ -92,7 +93,7 @@ class TestETLPipeline:
                 data = response.json()
                 assert data["event_id"] == "test-event-id-123"
                 assert data["status"] == "ingested"
-                assert "B08N5WRWNW" in data["message"]
+                assert "RealTestData.PRIMARY_TEST_ASIN" in data["message"]
     
     @pytest.mark.asyncio
     async def test_job_trigger_api(self):
@@ -189,7 +190,7 @@ class TestETLPipeline:
                 # Mock active alerts
                 mock_alert = MagicMock()
                 mock_alert.id = "alert-123"
-                mock_alert.asin = "B08N5WRWNW"
+                mock_alert.asin = "RealTestData.PRIMARY_TEST_ASIN"
                 mock_alert.alert_type = "price_spike"
                 mock_alert.severity = "medium"
                 mock_alert.current_value = 59.99
@@ -201,14 +202,14 @@ class TestETLPipeline:
                 
                 mock_get_alerts.return_value = [mock_alert]
                 
-                response = await ac.get("/v1/etl/alerts?asin=B08N5WRWNW&limit=10")
+                response = await ac.get(f"/v1/etl/alerts?asin={RealTestData.PRIMARY_TEST_ASIN}&limit=10")
                 
                 assert response.status_code == 200
                 data = response.json()
                 assert len(data) == 1
                 assert data[0]["id"] == "alert-123"
                 assert data[0]["alert_type"] == "price_spike"
-                assert data[0]["asin"] == "B08N5WRWNW"
+                assert data[0]["asin"] == "RealTestData.PRIMARY_TEST_ASIN"
     
     @pytest.mark.asyncio
     async def test_alert_resolution_api(self):

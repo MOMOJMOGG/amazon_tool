@@ -5,14 +5,15 @@ from httpx import AsyncClient
 from unittest.mock import patch
 
 from src.main.app import app
+from src.test.fixtures.real_test_data import RealTestData, get_test_asin
 
 
 class TestRealDataAPIs:
     """Test M1-M3 APIs with real loaded Apify data."""
     
     # Real ASINs from our loaded dataset
-    REAL_MAIN_ASIN = "B0FDKB341G"  # Wireless earbuds
-    REAL_COMP_ASIN = "B0F6BJSTSQ"  # Competitor
+    REAL_MAIN_ASIN = RealTestData.PRIMARY_TEST_ASIN  # Soundcore headphones
+    REAL_COMP_ASIN = RealTestData.ALTERNATIVE_TEST_ASINS[0]  # Competitor
     INVALID_ASIN = "B999999999"     # Not in our dataset
     
     @pytest.mark.asyncio
@@ -97,7 +98,7 @@ class TestRealDataAPIs:
             await ac.delete(f"/v1/competitions/links/{self.REAL_MAIN_ASIN}")
             
             # Set up exactly 5 legitimate competitors from config file
-            legitimate_competitors = ["B0F6BJSTSQ", "B0CHYJT52D", "B0F9DM91VJ", "B0CG2Z78TL", "B0C6KKQ7ND"]
+            legitimate_competitors = [RealTestData.ALTERNATIVE_TEST_ASINS[0], "B0CHYJT52D", "B0F9DM91VJ", "B0CG2Z78TL", RealTestData.PRIMARY_TEST_ASIN]
             
             setup_response = await ac.post("/v1/competitions/setup", json={
                 "asin_main": self.REAL_MAIN_ASIN,
@@ -200,7 +201,7 @@ class TestRealDataAPIs:
         await init_db()
         
         real_asins = [
-            "B0FDKB341G",  # Main product
+            RealTestData.PRIMARY_TEST_ASIN,  # Main product
             "B09JVCL7JR",  # Another main product
             "B0FDK6TTSG",  # Another main product
         ]

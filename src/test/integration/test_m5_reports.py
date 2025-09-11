@@ -6,6 +6,7 @@ from httpx import AsyncClient
 from unittest.mock import patch, AsyncMock
 
 from src.main.app import app
+from src.test.fixtures.real_test_data import RealTestData, get_test_asin
 
 
 class TestCompetitionReportEndpoints:
@@ -14,7 +15,7 @@ class TestCompetitionReportEndpoints:
     @pytest.fixture
     def known_asins(self):
         """Return ASINs that should exist in the test database."""
-        return ["B0FDKB341G", "B0F6BJSTSQ"]
+        return [RealTestData.PRIMARY_TEST_ASIN, RealTestData.ALTERNATIVE_TEST_ASINS[0]]
     
     @pytest.mark.asyncio
     async def test_report_endpoints_available(self):
@@ -22,7 +23,7 @@ class TestCompetitionReportEndpoints:
         from src.main.database import init_db
         await init_db()
         
-        test_asin = "B0FDKB341G"
+        test_asin = RealTestData.PRIMARY_TEST_ASIN
         
         async with AsyncClient(app=app, base_url="http://test") as ac:
             # Test GET report endpoint (may return 404 if no report exists)
@@ -149,8 +150,8 @@ class TestReportGenerationWithMockLLM:
         
         await init_db()
         
-        test_asin_main = "B0FDKB341G"
-        test_competitor = "B0F6BJSTSQ"
+        test_asin_main = RealTestData.PRIMARY_TEST_ASIN
+        test_competitor = RealTestData.ALTERNATIVE_TEST_ASINS[0]
         
         # First, setup competitor links
         await comparison_service.setup_competitor_links(
@@ -217,8 +218,8 @@ class TestReportGenerationWithMockLLM:
         
         await init_db()
         
-        test_asin_main = "B0FDKB341G"
-        test_competitor = "B0F6BJSTSQ"
+        test_asin_main = RealTestData.PRIMARY_TEST_ASIN
+        test_competitor = RealTestData.ALTERNATIVE_TEST_ASINS[0]
         
         # Setup competitor links
         await comparison_service.setup_competitor_links(
@@ -250,8 +251,8 @@ class TestReportGenerationWithMockLLM:
         
         await init_db()
         
-        test_asin_main = "B0FDKB341G"
-        test_competitor = "B0F6BJSTSQ"
+        test_asin_main = RealTestData.PRIMARY_TEST_ASIN
+        test_competitor = RealTestData.ALTERNATIVE_TEST_ASINS[0]
         
         # Setup competitor links
         await comparison_service.setup_competitor_links(
@@ -308,7 +309,7 @@ class TestReportEndpointErrorHandling:
         
         async with AsyncClient(app=app, base_url="http://test") as ac:
             response = await ac.get(
-                "/v1/competitions/B0FDKB341G/report",
+                "/v1/competitions/RealTestData.PRIMARY_TEST_ASIN/report",
                 params={"version": "invalid_version"}
             )
             
@@ -327,7 +328,7 @@ class TestReportEndpointErrorHandling:
         
         async with AsyncClient(app=app, base_url="http://test") as ac:
             response = await ac.get(
-                "/v1/competitions/B0FDKB341G/report",
+                "/v1/competitions/RealTestData.PRIMARY_TEST_ASIN/report",
                 params={"version": "999"}  # Version unlikely to exist
             )
             
@@ -363,7 +364,7 @@ class TestReportMetricsIntegration:
         
         async with AsyncClient(app=app, base_url="http://test") as ac:
             # Make report request
-            response = await ac.get("/v1/competitions/B0FDKB341G/report")
+            response = await ac.get("/v1/competitions/RealTestData.PRIMARY_TEST_ASIN/report")
             
             # Response code doesn't matter for metrics test
             assert response.status_code in [200, 404, 500]
@@ -383,7 +384,7 @@ class TestReportDataQuality:
         
         await init_db()
         
-        test_asin = "B0FDKB341G"
+        test_asin = RealTestData.PRIMARY_TEST_ASIN
         
         # Test evidence gathering using real Supabase queries
         evidence = await report_service.get_evidence_data(test_asin, 30)

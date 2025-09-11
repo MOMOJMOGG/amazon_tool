@@ -6,6 +6,7 @@ from httpx import AsyncClient
 from unittest.mock import patch
 
 from src.main.app import app
+from src.test.fixtures.real_test_data import RealTestData, get_test_asin
 
 
 class TestGraphQLEndpoint:
@@ -69,7 +70,7 @@ class TestGraphQLQueriesWithRealData:
     @pytest.fixture
     def known_asins(self):
         """Return ASINs that should exist in the test database."""
-        return ["B0FDKB341G", "B0F6BJSTSQ"]  # From previous M1-M4 testing
+        return [RealTestData.PRIMARY_TEST_ASIN, RealTestData.ALTERNATIVE_TEST_ASINS[0]]  # From real test data
     
     @pytest.mark.asyncio
     async def test_product_query_real_data(self, known_asins):
@@ -435,7 +436,7 @@ class TestGraphQLPerformance:
         # in a single GraphQL query results in efficient batch loading
         # rather than individual queries per product
         
-        test_asins = ["B0FDKB341G", "B0F6BJSTSQ"]
+        test_asins = [RealTestData.PRIMARY_TEST_ASIN, RealTestData.ALTERNATIVE_TEST_ASINS[0]]
         
         async with AsyncClient(app=app, base_url="http://test") as ac:
             query = """
@@ -498,7 +499,7 @@ class TestGraphQLPerformance:
         async with AsyncClient(app=app, base_url="http://test") as ac:
             # Send 5 concurrent requests
             tasks = [
-                single_request(ac, "B0FDKB341G") for _ in range(5)
+                single_request(ac, RealTestData.PRIMARY_TEST_ASIN) for _ in range(5)
             ]
             
             responses = await asyncio.gather(*tasks)
@@ -549,7 +550,7 @@ class TestRealDataIntegration:
         
         # This would test that GraphQL queries properly use Redis cache
         # First request should miss cache, second should hit
-        test_asin = "B0FDKB341G"
+        test_asin = RealTestData.PRIMARY_TEST_ASIN
         
         async with AsyncClient(app=app, base_url="http://test") as ac:
             query = """
