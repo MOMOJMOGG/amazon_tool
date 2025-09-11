@@ -116,13 +116,21 @@ class TestRateLimiter:
     @pytest.fixture
     def mock_redis(self):
         """Mock Redis client."""
+        from unittest.mock import MagicMock
+        
+        # Create a mock pipeline that supports method chaining
+        pipeline_mock = MagicMock()
+        pipeline_mock.zremrangebyscore.return_value = pipeline_mock
+        pipeline_mock.zcard.return_value = pipeline_mock
+        pipeline_mock.zadd.return_value = pipeline_mock
+        pipeline_mock.expire.return_value = pipeline_mock
+        pipeline_mock.execute = AsyncMock(return_value=[None, 0, 1, True])
+        
         redis_mock = AsyncMock()
-        redis_mock.pipeline.return_value = redis_mock
-        redis_mock.zremrangebyscore.return_value = None
-        redis_mock.zcard.return_value = 0
-        redis_mock.zadd.return_value = 1
-        redis_mock.expire.return_value = True
-        redis_mock.execute.return_value = [None, 0, 1, True]
+        redis_mock.pipeline.return_value = pipeline_mock
+        redis_mock.zrem = AsyncMock(return_value=1)
+        redis_mock.delete = AsyncMock(return_value=1)
+        
         return redis_mock
     
     @pytest.mark.asyncio
@@ -140,8 +148,17 @@ class TestRateLimiter:
     @pytest.mark.asyncio
     async def test_rate_limiter_block_exceeded_requests(self, mock_redis):
         """Test rate limiter blocks when limit exceeded."""
-        # Mock high request count
-        mock_redis.execute.return_value = [None, 15, 1, True]  # 15 existing requests
+        # Create a separate pipeline mock for this test case with high request count
+        from unittest.mock import MagicMock
+        
+        pipeline_mock = MagicMock()
+        pipeline_mock.zremrangebyscore.return_value = pipeline_mock
+        pipeline_mock.zcard.return_value = pipeline_mock
+        pipeline_mock.zadd.return_value = pipeline_mock
+        pipeline_mock.expire.return_value = pipeline_mock
+        pipeline_mock.execute = AsyncMock(return_value=[None, 15, 1, True])  # 15 existing requests
+        
+        mock_redis.pipeline.return_value = pipeline_mock
         
         limiter = RateLimiter(mock_redis)
         rule = RateLimitRule(requests=10, window_seconds=60)
