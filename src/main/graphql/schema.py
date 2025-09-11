@@ -4,12 +4,8 @@ import strawberry
 from typing import Optional
 
 from src.main.graphql.types import Product, Competition, Report, RefreshResponse, Range
-from src.main.graphql.resolvers import QueryResolver, MutationResolver, setup_field_resolvers
+from src.main.graphql.simple_resolvers import SimpleQueryResolver, SimpleMutationResolver
 from src.main.graphql.context import GraphQLContext, get_context
-
-
-# Set up field resolvers
-setup_field_resolvers()
 
 
 @strawberry.type
@@ -19,12 +15,12 @@ class QueryRoot:
     @strawberry.field
     async def product(self, info, asin: str) -> Optional[Product]:
         """Get a single product by ASIN."""
-        return await QueryResolver.product(asin, info)
+        return await SimpleQueryResolver.product(asin, info)
     
     @strawberry.field  
     async def products(self, info, asins: list[str]) -> list[Product]:
         """Get multiple products by ASINs."""
-        return await QueryResolver.products(asins, info)
+        return await SimpleQueryResolver.products(asins, info)
     
     @strawberry.field
     async def competition(
@@ -35,12 +31,12 @@ class QueryRoot:
         range: Range = Range.D30
     ) -> Optional[Competition]:
         """Get competition analysis for a main product."""
-        return await QueryResolver.competition(asin_main, peers, range, info)
+        return await SimpleQueryResolver.competition(asin_main, peers, range, info)
     
     @strawberry.field
     async def latest_report(self, info, asin_main: str) -> Optional[Report]:
         """Get the latest competition report for a product."""
-        return await QueryResolver.latest_report(asin_main, info)
+        return await SimpleQueryResolver.latest_report(asin_main, info)
 
 
 @strawberry.type
@@ -50,12 +46,12 @@ class MutationRoot:
     @strawberry.field
     async def refresh_product(self, info, asin: str) -> RefreshResponse:
         """Trigger product data refresh."""
-        return await MutationResolver.refresh_product(asin, info)
+        return await SimpleMutationResolver.refresh_product(asin, info)
     
     @strawberry.field
     async def refresh_competition_report(self, info, asin_main: str) -> RefreshResponse:
         """Trigger competition report generation."""
-        return await MutationResolver.refresh_competition_report(asin_main, info)
+        return await SimpleMutationResolver.refresh_competition_report(asin_main, info)
 
 
 # Create the schema

@@ -273,11 +273,11 @@ async def get_competition_report(
             await record_cache_operation("report", "miss")
         
         # Get report from database
-        from src.main.database import get_async_session
+        from src.main.database import get_db_session
         from src.main.models.competition import CompetitionReport
         from sqlalchemy import select
         
-        async with get_async_session() as session:
+        async with get_db_session() as session:
             if version == "latest":
                 # Get latest version
                 result = await session.execute(
@@ -358,12 +358,12 @@ async def refresh_competition_report(
         
         # Check for recent report unless forced
         if not force:
-            from src.main.database import get_async_session
+            from src.main.database import get_db_session
             from src.main.models.competition import CompetitionReport
             from sqlalchemy import select
             from datetime import timedelta
             
-            async with get_async_session() as session:
+            async with get_db_session() as session:
                 recent_cutoff = datetime.utcnow() - timedelta(hours=6)  # 6 hours
                 result = await session.execute(
                     select(CompetitionReport)
@@ -432,11 +432,11 @@ async def list_report_versions(
     Returns version history with metadata.
     """
     try:
-        from src.main.database import get_async_session
+        from src.main.database import get_db_session
         from src.main.models.competition import CompetitionReport
         from sqlalchemy import select
         
-        async with get_async_session() as session:
+        async with get_db_session() as session:
             result = await session.execute(
                 select(CompetitionReport.version, CompetitionReport.generated_at, CompetitionReport.model)
                 .where(CompetitionReport.asin_main == asin_main)

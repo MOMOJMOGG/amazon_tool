@@ -14,7 +14,7 @@ from src.main.config import settings
 from src.main.models.competition import CompetitionReport, CompetitorComparisonDaily
 from src.main.models.product import Product, ProductMetricsDaily
 from src.main.models.mart import ProductSummary
-from src.main.database import get_async_session
+from src.main.database import get_db_session
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ class ReportGenerationService:
     ) -> Optional[CompetitionEvidence]:
         """Gather evidence data from database for report generation."""
         try:
-            async with get_async_session() as session:
+            async with get_db_session() as session:
                 end_date = date.today()
                 start_date = end_date - timedelta(days=date_range_days)
                 
@@ -141,7 +141,7 @@ class ReportGenerationService:
     ) -> Optional[int]:
         """Save generated report to database."""
         try:
-            async with get_async_session() as session:
+            async with get_db_session() as session:
                 # Get next version number
                 result = await session.execute(
                     select(CompetitionReport.version)
