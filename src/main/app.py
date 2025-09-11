@@ -63,35 +63,31 @@ app.include_router(competitions_router)
 
 # Add GraphQL endpoint for M5
 try:
+    import strawberry
     from strawberry.fastapi import GraphQLRouter
-    from src.main.graphql.schema import schema
-    from src.main.graphql.context import get_context
     
-    # Create GraphQL router with context
-    graphql_app = GraphQLRouter(
-        schema, 
-        context_getter=get_context
-    )
+    # Test basic strawberry functionality
+    @strawberry.type
+    class TestQuery:
+        @strawberry.field
+        def hello(self) -> str:
+            return "Hello from GraphQL!"
+    
+    test_schema = strawberry.Schema(query=TestQuery)
+    
+    # Create simple GraphQL router for testing
+    graphql_app = GraphQLRouter(test_schema)
     
     # Include GraphQL router
     app.include_router(graphql_app, prefix="/graphql", include_in_schema=False)
-    logger.info("GraphQL endpoint configured at /graphql")
+    logger.info("GraphQL endpoint configured at /graphql (test mode)")
     
     # Add schema endpoint for development
     if settings.environment == "development":
         @app.get("/graphql/schema")
         async def get_graphql_schema():
             """Get GraphQL schema SDL for development."""
-            return {"sdl": str(schema)}
-        
-        @app.get("/graphql/operations")
-        async def get_persisted_operations():
-            """Get list of persisted GraphQL operations for development."""
-            from src.main.graphql.schema import PERSISTED_QUERIES
-            return {
-                "operations": list(PERSISTED_QUERIES.keys()),
-                "total_operations": len(PERSISTED_QUERIES)
-            }
+            return {"sdl": str(test_schema)}
     
 except ImportError as e:
     logger.warning(f"Could not import GraphQL dependencies: {e}")
