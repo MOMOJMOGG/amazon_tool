@@ -68,17 +68,18 @@ async def test_client():
 
 @pytest.fixture
 def sample_product_data():
-    """Sample product data for testing."""
+    """Sample product data for testing using real test data."""
+    from src.test.fixtures.real_test_data import RealTestData
     return {
-        "asin": "B0B8YNRS6D",
-        "title": "BERIBES Bluetooth Headphones Over Ear, 65H Playtime and 6 EQ Music Modes Wireless Heaphones with Microphone, HiFi Stereo Foldable Lightweight Headset (White)",
-        "brand": "BERIBES",
-        "category": "Over-Ear Headphones",
-        "image_url": "https://m.media-amazon.com/images/I/61bnUaDGWPL._AC_SL1500_.jpg",
-        "latest_price": 21.99,
-        "latest_bsr": 1,
-        "latest_rating": 4.5,
-        "latest_reviews_count": 44446,
-        "latest_buybox_price": 21.99,
+        "asin": RealTestData.PRIMARY_TEST_ASIN,
+        "title": RealTestData.PRIMARY_PRODUCT_TITLE,
+        "brand": RealTestData.PRIMARY_PRODUCT_BRAND,
+        "category": RealTestData.PRIMARY_PRODUCT_CATEGORY,
+        "image_url": "https://example.com/product-image.jpg",
+        "latest_price": 99.99,
+        "latest_bsr": 15420,
+        "latest_rating": 4.3,
+        "latest_reviews_count": 2847,
+        "latest_buybox_price": 97.99,
         "last_updated": "2025-09-11T03:49:15",
     }
