@@ -58,7 +58,8 @@ class DemoAPIClient:
     
     async def get_batch_products(self, asins: List[str]) -> Dict[str, Any]:
         """Get multiple products in batch."""
-        return await self.make_request("GET", f"{API_BASE_URL}/v1/products/metrics:batch?asins=" + ",".join(asins))
+        payload = {"asins": asins}
+        return await self.make_request("POST", f"{API_BASE_URL}/v1/products/batch", json=payload)
     
     async def setup_competition(self, main_asin: str, competitor_asins: List[str]) -> Dict[str, Any]:
         """Setup competitive analysis."""
@@ -229,7 +230,7 @@ async def demo_get_product(asin: str):
     if result.get("success") and result.get("data"):
         product_data = result["data"].get("data", {})
         info_html = f"""
-        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; background-color: #f9f9f9;">
+        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; background-color: #374151;">
             <h3>📦 {product_data.get('title', 'Unknown Product')}</h3>
             <p><strong>Brand:</strong> {product_data.get('brand', 'N/A')}</p>
             <p><strong>Category:</strong> {product_data.get('category', 'N/A')}</p>
@@ -275,7 +276,7 @@ async def demo_batch_products(asins_text: str):
         per_product_time = batch_time / len(asins)
         
         perf_html = f"""
-        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; background-color: #e8f5e8;">
+        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 8px; background-color: #374151;">
             <h3>🚀 Batch Performance</h3>
             <p><strong>Products Requested:</strong> {len(asins)}</p>
             <p><strong>Total Time:</strong> {batch_time:.3f}s</p>
@@ -348,7 +349,7 @@ async def demo_get_report(asin: str):
             opportunities = summary.get("improvement_opportunities", [])
             
             report_html = f"""
-            <div style="border: 1px solid #ddd; padding: 20px; border-radius: 8px; background-color: #f0f8ff;">
+            <div style="border: 1px solid #ddd; padding: 20px; border-radius: 8px; background-color: #374151;">
                 <h3>🤖 AI Competition Analysis Report</h3>
                 <p><strong>Competitive Position:</strong> {summary.get('competitive_position', 'N/A')}</p>
                 
