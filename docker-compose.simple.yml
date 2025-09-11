@@ -10,7 +10,7 @@ services:
     image: nginx:1.25-alpine
     container_name: amazon_tool_nginx
     ports:
-      - "80:80"
+      - "8080:80"
     volumes:
       - ./nginx/nginx.simple.conf:/etc/nginx/nginx.conf:ro
       - ./swagger-ui:/usr/share/nginx/html/docs:ro

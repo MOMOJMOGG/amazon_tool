@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         case_sensitive=False,
-        extra="ignore"  # Ignore extra fields instead of raising errors
+        extra="allow"  # Allow extra fields to avoid validation errors
     )
     
     # Database Configuration
