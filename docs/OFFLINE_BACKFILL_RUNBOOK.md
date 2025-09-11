@@ -66,8 +66,8 @@ python tools/offline/loader.py --setup-competition
 
 ### Sample Data Quality
 ```
-Sample Product: B0FDKB341G - Wireless Earbuds, Bluetooth Headphones 5.4 HiFi St...
-Sample Metric: B0FDKB341G - Price: $25.99, Rating: 5.0
+Sample Product: B0C6KKQ7ND - Soundcore by Anker, Space One, Active Noise Cancelling Headphones
+Sample Metric: B0C6KKQ7ND - Price: $99.99, Rating: 4.3
 ```
 
 ### Data Mapping Success

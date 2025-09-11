@@ -15,6 +15,12 @@ from datetime import datetime, date, timedelta
 from typing import List, Dict, Any
 import httpx
 import asyncio
+import sys
+import os
+
+# Add src to path to import test data configuration
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+from test.fixtures.real_test_data import RealTestData, get_test_asin
 
 
 class TestDataGenerator:
@@ -23,9 +29,9 @@ class TestDataGenerator:
     def __init__(self):
         self.sample_products = [
             {
-                "asin": "B08N5WRWNW",
-                "title": "Echo Dot (4th Gen) | Smart speaker with Alexa",
-                "brand": "Amazon",
+                "asin": RealTestData.PRIMARY_TEST_ASIN,
+                "title": RealTestData.PRIMARY_PRODUCT_TITLE,
+                "brand": RealTestData.PRIMARY_PRODUCT_BRAND,
                 "category": "Electronics",
                 "base_price": 49.99,
                 "base_bsr": 1,

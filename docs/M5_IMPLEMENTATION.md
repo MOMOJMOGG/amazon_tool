@@ -289,7 +289,7 @@ if settings.environment == "development":
 5. **Error Handling Tests** - API failures, database disconnections, OpenAI rate limits
 
 **Real Data Requirements:**
-- Use existing ASINs from Supabase: B0FDKB341G, B0F6BJSTSQ, etc.
+- Use existing ASINs from Supabase: B0C6KKQ7ND, B0FDKB341G, B0DNBQ6HPR, etc.
 - Test with actual competition relationships
 - Validate against real product metrics from mart tables
 - Generate reports using actual competitive analysis data
@@ -325,10 +325,10 @@ if settings.environment == "development":
 # Test GraphQL endpoint
 curl -X POST http://localhost:8000/graphql \
   -H "Content-Type: application/json" \
-  -d '{"query": "query getProductOverview($asin: ID!) { product(asin: $asin) { asin title latest { price bsr rating } } }", "variables": {"asin": "B0FDKB341G"}}'
+  -d '{"query": "query getProductOverview($asin: ID!) { product(asin: $asin) { asin title latest { price bsr rating } } }", "variables": {"asin": "B0C6KKQ7ND"}}'
 
 # Generate competition report
-curl -X POST http://localhost:8000/v1/competitions/B0FDKB341G/report:refresh
+curl -X POST http://localhost:8000/v1/competitions/B0C6KKQ7ND/report:refresh
 ```
 
 **Monitoring:**

@@ -152,13 +152,13 @@ curl -X POST "http://localhost:8000/v1/etl/jobs/trigger" \
 curl -X POST "http://localhost:8000/v1/etl/events/ingest" \
   -H "Content-Type: application/json" \
   -d '{
-    "asin": "B08N5WRWNW",
+    "asin": "B0C6KKQ7ND",
     "source": "manual_test",
     "event_type": "product_update",
     "raw_data": {
-      "asin": "B08N5WRWNW",
-      "title": "Echo Dot (4th Gen) Test",
-      "brand": "Amazon",
+      "asin": "B0C6KKQ7ND",
+      "title": "Soundcore by Anker, Space One, Active Noise Cancelling Headphones",
+      "brand": "Anker",
       "price": 49.99,
       "bsr": 1000,
       "rating": 4.5,
@@ -173,7 +173,7 @@ curl -X POST "http://localhost:8000/v1/etl/events/ingest" \
 {
   "event_id": "uuid-string",
   "status": "ingested",
-  "message": "Raw event ingested for ASIN B08N5WRWNW"
+  "message": "Raw event ingested for ASIN B0C6KKQ7ND"
 }
 ```
 
@@ -221,7 +221,7 @@ curl "http://localhost:8000/v1/etl/alerts?limit=10"
 [
   {
     "id": "alert-uuid",
-    "asin": "B08N5WRWNW", 
+    "asin": "B0C6KKQ7ND", 
     "alert_type": "price_spike",
     "severity": "medium",
     "current_value": 59.99,
@@ -234,7 +234,7 @@ curl "http://localhost:8000/v1/etl/alerts?limit=10"
 
 #### 4.2 Get Alerts for Specific ASIN
 ```bash
-curl "http://localhost:8000/v1/etl/alerts?asin=B08N5WRWNW&limit=5"
+curl "http://localhost:8000/v1/etl/alerts?asin=B0C6KKQ7ND&limit=5"
 ```
 
 #### 4.3 Resolve Alert

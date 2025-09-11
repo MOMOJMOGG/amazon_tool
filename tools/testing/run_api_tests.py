@@ -18,7 +18,12 @@ import requests
 import json
 import time
 import sys
+import os
 from typing import Dict, Any
+
+# Add src to path to import test data configuration
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+from test.fixtures.real_test_data import RealTestData, get_test_asin
 
 BASE_URL = "http://localhost:8000"
 
@@ -133,11 +138,11 @@ class APITester:
             "POST",
             f"{BASE_URL}/v1/etl/events/ingest",
             {
-                "asin": "B08N5WRWNW",
+                "asin": "RealTestData.PRIMARY_TEST_ASIN",
                 "source": "api_test",
                 "event_type": "product_update",
                 "raw_data": {
-                    "asin": "B08N5WRWNW",
+                    "asin": "RealTestData.PRIMARY_TEST_ASIN",
                     "title": "Echo Dot (4th Gen) API Test",
                     "brand": "Amazon",
                     "price": 49.99,
@@ -180,7 +185,7 @@ class APITester:
         self.test_endpoint(
             "Get Alerts for ASIN",
             "GET",
-            f"{BASE_URL}/v1/etl/alerts?asin=B08N5WRWNW&limit=5"
+            f"{BASE_URL}/v1/etl/alerts?asin={RealTestData.PRIMARY_TEST_ASIN}&limit=5"
         )
         
         self.test_endpoint(
