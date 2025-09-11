@@ -249,7 +249,7 @@ class CompetitorComparisonService:
             ).order_by(CompetitorComparisonDaily.date.desc(), CompetitorComparisonDaily.asin_comp)
             
             result = await session.execute(stmt)
-            comparisons = result.fetchall()
+            comparisons = result.scalars().all()
         
         # Convert to dict format
         competition_data = []
@@ -302,7 +302,7 @@ class CompetitorComparisonService:
             ).order_by(CompetitorComparisonDaily.asin_comp)
             
             result = await session.execute(stmt)
-            comparisons = result.fetchall()
+            comparisons = result.scalars().all()
         
         peer_gaps = []
         for comp in comparisons:
