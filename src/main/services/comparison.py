@@ -73,7 +73,7 @@ class CompetitorComparisonService:
                 # Remove all links for this main product
                 stmt = select(CompetitorLink).where(CompetitorLink.asin_main == asin_main)
                 result = await session.execute(stmt)
-                links_to_delete = result.fetchall()
+                links_to_delete = result.scalars().all()
                 
                 for link in links_to_delete:
                     await session.delete(link)
