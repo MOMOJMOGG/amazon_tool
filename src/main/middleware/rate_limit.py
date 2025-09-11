@@ -109,6 +109,10 @@ class RateLimiter:
             logger.error(f"Redis error in rate limiter: {e}")
             # If Redis fails, allow the request but log the error
             return True, {'limit': rule.requests, 'remaining': rule.requests, 'reset': 0}
+        except Exception as e:
+            logger.error(f"Unexpected error in rate limiter: {e}")
+            # If any error occurs, fail safe by allowing the request
+            return True, {'limit': rule.requests, 'remaining': rule.requests, 'reset': 0}
     
     async def reset_limit(self, key: str) -> bool:
         """Reset rate limit for a key."""
@@ -119,7 +123,10 @@ class RateLimiter:
             await self.redis_client.delete(key)
             return True
         except RedisError as e:
-            logger.error(f"Error resetting rate limit for {key}: {e}")
+            logger.error(f"Redis error resetting rate limit for {key}: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"Unexpected error resetting rate limit for {key}: {e}")
             return False
 
 

@@ -189,9 +189,11 @@ class TestRateLimiter:
     @pytest.mark.asyncio
     async def test_rate_limiter_redis_error_handling(self):
         """Test rate limiter handles Redis errors gracefully."""
-        # Create a Redis mock that raises an exception during pipeline execution
+        from src.main.middleware.rate_limit import RedisError
+        
+        # Test RedisError handling
         redis_mock = self.create_proper_redis_mock()
-        redis_mock.pipeline.return_value.execute = AsyncMock(side_effect=Exception("Redis connection failed"))
+        redis_mock.pipeline.return_value.execute = AsyncMock(side_effect=RedisError("Redis connection failed"))
         
         limiter = RateLimiter(redis_mock)
         rule = RateLimitRule(requests=10, window_seconds=60)
@@ -200,6 +202,22 @@ class TestRateLimiter:
         allowed, info = await limiter.is_allowed("test_key", rule)
         
         assert allowed is True  # Should allow when Redis fails
+        assert info['limit'] == 10
+    
+    @pytest.mark.asyncio
+    async def test_rate_limiter_generic_error_handling(self):
+        """Test rate limiter handles generic errors gracefully."""
+        # Test generic Exception handling  
+        redis_mock = self.create_proper_redis_mock()
+        redis_mock.pipeline.return_value.execute = AsyncMock(side_effect=Exception("Unexpected error"))
+        
+        limiter = RateLimiter(redis_mock)
+        rule = RateLimitRule(requests=10, window_seconds=60)
+        
+        # Should fall back to allowing the request when any error occurs
+        allowed, info = await limiter.is_allowed("test_key", rule)
+        
+        assert allowed is True  # Should allow when any error occurs
         assert info['limit'] == 10
     
     @pytest.mark.asyncio
