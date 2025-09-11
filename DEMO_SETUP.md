@@ -29,7 +29,25 @@ pip install gradio>=4.0.0 plotly>=5.0.0 pandas>=1.5.0
 pip install -r requirements.txt
 ```
 
-### Step 2: Start Your Backend API
+### Step 2: Setup Competition Database Tables
+
+The competition features require additional database tables. Run the setup script:
+
+```bash
+# Activate your virtual environment first
+source ~/.pyenv/versions/amazon/bin/activate
+
+# Run the database setup script
+python setup_demo_db.py
+```
+
+**Alternative: Manual SQL Setup**
+```bash
+# If the Python script doesn't work, run the SQL manually
+psql -h your-db-host -U your-user -d your-database -f setup_competition_tables.sql
+```
+
+### Step 3: Start Your Backend API
 
 ```bash
 # Make sure your main API is running
@@ -39,7 +57,7 @@ uvicorn src.main.app:app --reload --host 0.0.0.0 --port 8000
 docker-compose -f docker-compose.simple.yml up -d
 ```
 
-### Step 3: Launch Demo App
+### Step 4: Launch Demo App
 
 ```bash
 # Run the demo app
