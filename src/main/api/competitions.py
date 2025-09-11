@@ -130,7 +130,7 @@ async def get_competition_data(
         cached_data = await cache.get(cache_key)
         
         if cached_data:
-            await record_cache_operation("competition_data", "hit")
+            record_cache_operation("competition_data", "hit")
             logger.info(f"Returning cached competition data for {asin_main}")
             
             return CompetitionResponse(
@@ -143,7 +143,7 @@ async def get_competition_data(
                 stale_at=datetime.utcnow()  # TODO: Calculate proper stale time
             )
         
-        await record_cache_operation("competition_data", "miss")
+        record_cache_operation("competition_data", "miss")
         
         # Get competition data from service
         competition_records = await comparison_service.get_competition_data(
@@ -266,11 +266,11 @@ async def get_competition_report(
             cached_report = await cache.get(cache_key)
             
             if cached_report:
-                await record_cache_operation("report", "hit")
+                record_cache_operation("report", "hit")
                 logger.info(f"Returning cached report for {asin_main}")
                 return CompetitionReportSummary(**cached_report)
             
-            await record_cache_operation("report", "miss")
+            record_cache_operation("report", "miss")
         
         # Get report from database
         from src.main.database import get_db_session
