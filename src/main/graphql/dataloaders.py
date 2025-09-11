@@ -1,6 +1,6 @@
 """DataLoader implementations for efficient batch loading in GraphQL."""
 
-from dataloader import DataLoader
+from aiodataloader import DataLoader
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import date, datetime, timedelta
 from sqlalchemy import select, and_
