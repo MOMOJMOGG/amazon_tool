@@ -1,0 +1,192 @@
+version: '3.8'
+
+# Simplified Docker Compose for Amazon Product Monitoring Tool
+# Core services: API, Cache, Workers, Nginx (without Grafana/Prometheus)
+# Usage: docker-compose -f docker-compose.simple.yml up -d
+
+services:
+  # Nginx Reverse Proxy & API Gateway
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: amazon_tool_nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.simple.conf:/etc/nginx/nginx.conf:ro
+      - ./swagger-ui:/usr/share/nginx/html/docs:ro
+      - nginx_cache:/var/cache/nginx
+    environment:
+      - API_HOST=api
+      - API_PORT=8000
+    depends_on:
+      - api
+    networks:
+      - frontend
+      - backend
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # FastAPI Backend
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: amazon_tool_api
+    ports:
+      - "8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - APIFY_API_KEY=${APIFY_API_KEY}
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+    volumes:
+      - api_logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Celery Workers for Background Processing
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: amazon_tool_worker
+    command: celery -A src.main.tasks worker --loglevel=INFO --concurrency=4 --prefetch-multiplier=1
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - APIFY_API_KEY=${APIFY_API_KEY}
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - C_FORCE_ROOT=1
+    volumes:
+      - worker_logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "celery", "-A", "src.main.tasks", "inspect", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Celery Beat Scheduler
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: amazon_tool_scheduler
+    command: celery -A src.main.tasks beat --loglevel=INFO --schedule=/tmp/celerybeat-schedule
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=redis://redis:6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - APIFY_API_KEY=${APIFY_API_KEY}
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - C_FORCE_ROOT=1
+    volumes:
+      - scheduler_logs:/app/logs
+      - scheduler_data:/tmp
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Redis - Cache & Message Broker (Cache-First Mechanism)
+  redis:
+    image: redis:7-alpine
+    container_name: amazon_tool_redis
+    ports:
+      - "6379"
+    volumes:
+      - redis_data:/data
+      - ./monitoring/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    networks:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+# Networks
+networks:
+  frontend:
+    driver: bridge
+    name: amazon_tool_frontend
+  backend:
+    driver: bridge
+    name: amazon_tool_backend
+    internal: false
+
+# Volumes
+volumes:
+  # Application data
+  redis_data:
+    name: amazon_tool_redis_data
+  
+  # Logs
+  api_logs:
+    name: amazon_tool_api_logs
+  worker_logs:
+    name: amazon_tool_worker_logs
+  scheduler_logs:
+    name: amazon_tool_scheduler_logs
+  
+  # Nginx
+  nginx_cache:
+    name: amazon_tool_nginx_cache
+  
+  # Scheduler
+  scheduler_data:
+    name: amazon_tool_scheduler_data

@@ -71,8 +71,8 @@ app = FastAPI(
     title="Amazon Product Monitoring Tool",
     description="FastAPI backend for Amazon product tracking and competitive analysis",
     version="1.0.0",
-    docs_url="/docs" if settings.environment == "development" else None,
-    redoc_url="/redoc" if settings.environment == "development" else None,
+    docs_url="/docs",
+    redoc_url="/redoc",
 )
 
 # Add CORS middleware
@@ -256,11 +256,80 @@ async def health_check() -> Dict[str, Any]:
         raise HTTPException(status_code=503, detail="Service unhealthy")
 
 
+# Enhanced Error Handling Middleware
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    """Handle HTTP exceptions with consistent response format."""
+    logger.warning(f"HTTP {exc.status_code}: {exc.detail} - {request.url}")
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "detail": exc.detail,
+            "status_code": exc.status_code,
+            "path": str(request.url),
+            "timestamp": datetime.now().isoformat()
+        }
+    )
+
 @app.exception_handler(500)
-async def internal_server_error(request, exc):
-    """Handle internal server errors."""
-    logger.error(f"Internal server error: {exc}")
+async def internal_server_error_handler(request, exc):
+    """Handle internal server errors with proper logging."""
+    logger.error(f"Internal server error at {request.url}: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"}
+        content={
+            "detail": "Internal server error",
+            "status_code": 500,
+            "path": str(request.url),
+            "timestamp": datetime.now().isoformat()
+        }
     )
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request, exc):
+    """Handle all uncaught exceptions."""
+    logger.error(f"Unexpected error at {request.url}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "An unexpected error occurred",
+            "status_code": 500,
+            "path": str(request.url),
+            "timestamp": datetime.now().isoformat()
+        }
+    )
+
+# Database connection error handling
+from sqlalchemy.exc import SQLAlchemyError
+@app.exception_handler(SQLAlchemyError)
+async def database_exception_handler(request, exc):
+    """Handle database connection errors."""
+    logger.error(f"Database error at {request.url}: {exc}")
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "Database temporarily unavailable",
+            "status_code": 503,
+            "path": str(request.url),
+            "timestamp": datetime.now().isoformat()
+        }
+    )
+
+# Redis connection error handling  
+try:
+    import redis
+    @app.exception_handler(redis.RedisError)
+    async def redis_exception_handler(request, exc):
+        """Handle Redis connection errors."""
+        logger.error(f"Redis error at {request.url}: {exc}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "Cache service temporarily unavailable",
+                "status_code": 503,
+                "path": str(request.url),
+                "timestamp": datetime.now().isoformat()
+            }
+        )
+except ImportError:
+    pass
