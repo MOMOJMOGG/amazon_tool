@@ -298,6 +298,47 @@ async def demo_setup_competition(main_asin: str, competitor_asins_text: str):
         return "Please enter valid competitor ASINs"
     
     result = await api_client.setup_competition(main_asin, competitor_asins)
+    
+    # Handle database/table setup issues gracefully
+    if not result.get("success") and "500" in str(result.get("error", "")):
+        return f"""❌ **Database Setup Required**
+
+The competition tables may not be created yet. This is expected for a demo setup.
+
+**To fix this:**
+1. Run database migrations: `alembic upgrade head`
+2. Or create tables manually in your PostgreSQL database:
+
+```sql
+-- Core schema tables
+CREATE SCHEMA IF NOT EXISTS core;
+CREATE TABLE IF NOT EXISTS core.competitor_links (
+    asin_main VARCHAR NOT NULL,
+    asin_comp VARCHAR NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY (asin_main, asin_comp)
+);
+
+-- Mart schema tables  
+CREATE SCHEMA IF NOT EXISTS mart;
+CREATE TABLE IF NOT EXISTS mart.competitor_comparison_daily (
+    asin_main VARCHAR NOT NULL,
+    asin_comp VARCHAR NOT NULL,
+    date DATE NOT NULL,
+    price_diff NUMERIC(10,2),
+    bsr_gap INTEGER,
+    rating_diff NUMERIC(3,2),
+    reviews_gap INTEGER,
+    buybox_diff NUMERIC(10,2),
+    extras JSONB,
+    PRIMARY KEY (asin_main, asin_comp, date)
+);
+```
+
+**For demo purposes:** You can skip this step and proceed to the other demo features (Product Monitoring, GraphQL, etc.)
+
+**Original Error:** {result.get('error', 'Unknown error')}"""
+    
     return format_json_response(result)
 
 async def demo_get_competition(asin: str, range_param: str):
@@ -306,6 +347,21 @@ async def demo_get_competition(asin: str, range_param: str):
         return "Please enter an ASIN", None, None
     
     result = await api_client.get_competition(asin, range_param)
+    
+    # Handle missing competition data gracefully
+    if not result.get("success") and "500" in str(result.get("error", "")):
+        error_response = f"""❌ **Competition Analysis Not Available**
+
+No competition data found. This could be because:
+1. Competition tables are not set up (see Competition Setup section)
+2. No competitor relationships have been configured for ASIN: {asin}
+3. Database schemas (core/mart) may need to be created
+
+**For demo purposes:** Try the Product Monitoring or GraphQL sections instead.
+
+**Original Error:** {result.get('error', 'Unknown error')}"""
+        return error_response, None, None
+    
     formatted_response = format_json_response(result)
     chart = create_competition_chart(result)
     
