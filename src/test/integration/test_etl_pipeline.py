@@ -130,9 +130,9 @@ class TestETLPipeline:
                 mock_job.status = "completed"
                 mock_job.records_processed = 100
                 mock_job.records_failed = 5
-                mock_job.created_at = datetime.utcnow()
-                mock_job.started_at = datetime.utcnow()
-                mock_job.completed_at = datetime.utcnow()
+                mock_job.created_at = datetime.now()
+                mock_job.started_at = datetime.now()
+                mock_job.completed_at = datetime.now()
                 mock_job.error_message = None
                 
                 mock_get_job.return_value = mock_job
@@ -197,7 +197,7 @@ class TestETLPipeline:
                 mock_alert.change_percent = 20.0
                 mock_alert.message = "Price spike detected"
                 mock_alert.is_resolved = "false"
-                mock_alert.created_at = datetime.utcnow()
+                mock_alert.created_at = datetime.now()
                 
                 mock_get_alerts.return_value = [mock_alert]
                 
@@ -277,9 +277,9 @@ class TestETLPipeline:
                 mock_job.status = "completed"
                 mock_job.records_processed = 2
                 mock_job.records_failed = 0
-                mock_job.created_at = datetime.utcnow()
-                mock_job.started_at = datetime.utcnow()
-                mock_job.completed_at = datetime.utcnow()
+                mock_job.created_at = datetime.now()
+                mock_job.started_at = datetime.now()
+                mock_job.completed_at = datetime.now()
                 mock_job.error_message = None
                 mock_job.job_name = "daily_etl_pipeline"
                 
@@ -307,7 +307,7 @@ class TestETLPipeline:
                 mock_stats.return_value = {
                     "product_summaries_count": 2,
                     "latest_aggregates_date": date.today().isoformat(),
-                    "last_updated": datetime.utcnow().isoformat()
+                    "last_updated": datetime.now().isoformat()
                 }
                 
                 stats_response = await ac.get("/v1/etl/stats")

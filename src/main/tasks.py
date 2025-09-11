@@ -94,7 +94,7 @@ def run_daily_etl_pipeline(self, target_date_str: str = None):
             job_metadata={
                 "target_date": target_date.isoformat(),
                 "celery_task_id": self.request.id,
-                "started_at": datetime.utcnow().isoformat()
+                "started_at": datetime.now().isoformat()
             }
         )
         
@@ -301,7 +301,7 @@ def health_check():
     """Basic health check task for monitoring."""
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now().isoformat(),
         "worker_id": health_check.request.id
     }
 

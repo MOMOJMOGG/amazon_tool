@@ -33,7 +33,7 @@ def generate_etag(data: Any) -> str:
         return etag
     except Exception:
         # Fallback to timestamp-based ETag if JSON serialization fails
-        timestamp = datetime.utcnow().isoformat()
+        timestamp = datetime.now().isoformat()
         hash_object = hashlib.sha256(timestamp.encode('utf-8'))
         return f'"{hash_object.hexdigest()[:16]}"'
 
@@ -99,7 +99,7 @@ class ETagData:
     def __init__(self, data: Any, etag: Optional[str] = None):
         self.data = data
         self.etag = etag or generate_etag(data)
-        self.timestamp = datetime.utcnow()
+        self.timestamp = datetime.now()
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for cache storage."""

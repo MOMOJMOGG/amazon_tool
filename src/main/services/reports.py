@@ -167,7 +167,7 @@ class ReportGenerationService:
                     },
                     evidence=report.evidence,
                     model=report.model_used,
-                    generated_at=datetime.utcnow()
+                    generated_at=datetime.now()
                 )
                 
                 session.add(db_report)

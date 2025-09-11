@@ -40,7 +40,7 @@ class CompetitorComparisonService:
                 stmt = pg_insert(CompetitorLink).values(
                     asin_main=asin_main,
                     asin_comp=comp_asin,
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now()
                 )
                 stmt = stmt.on_conflict_do_nothing()
                 

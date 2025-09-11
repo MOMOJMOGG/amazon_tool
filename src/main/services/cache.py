@@ -120,12 +120,12 @@ class CacheEntry:
     @property
     def is_expired(self) -> bool:
         """Check if cache entry is hard expired."""
-        return datetime.utcnow() > self.expires_at
+        return datetime.now() > self.expires_at
     
     @property
     def is_stale(self) -> bool:
         """Check if cache entry is stale (needs background refresh)."""
-        return datetime.utcnow() > self.stale_at
+        return datetime.now() > self.stale_at
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -226,7 +226,7 @@ class CacheService:
         try:
             entry = CacheEntry(
                 data=data,
-                cached_at=datetime.utcnow(),
+                cached_at=datetime.now(),
                 ttl_seconds=ttl_seconds,
                 stale_seconds=stale_seconds,
             )
@@ -331,7 +331,7 @@ class CacheService:
             ttl = ttl or settings.cache_ttl_seconds
             entry = CacheEntry(
                 data=value,
-                cached_at=datetime.utcnow(),
+                cached_at=datetime.now(),
                 ttl_seconds=ttl,
                 stale_seconds=ttl // 2  # Default stale time is half of TTL
             )
@@ -366,7 +366,7 @@ class CacheService:
             message = {
                 'pattern': pattern,
                 'reason': reason,
-                'timestamp': datetime.utcnow().isoformat()
+                'timestamp': datetime.now().isoformat()
             }
             
             await redis_pubsub_client.publish(

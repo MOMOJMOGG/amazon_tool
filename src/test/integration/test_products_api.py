@@ -117,7 +117,7 @@ class TestProductsAPI:
     @pytest.mark.asyncio
     async def test_get_product_cache_hit(self, sample_product_data):
         """Test get product with cache hit."""
-        stale_at = datetime.utcnow()
+        stale_at = datetime.now()
         
         async with AsyncClient(app=app, base_url="http://test") as ac:
             with patch('src.main.services.cache.cache.get_or_set') as mock_cache, \

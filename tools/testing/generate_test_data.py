@@ -159,7 +159,7 @@ class TestDataGenerator:
         buybox_price = round(buybox_price, 2)
         
         # Generate timestamp
-        event_date = datetime.utcnow() - timedelta(days=date_offset)
+        event_date = datetime.now() - timedelta(days=date_offset)
         
         return {
             "asin": product["asin"],

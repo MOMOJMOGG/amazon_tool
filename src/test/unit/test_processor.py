@@ -21,7 +21,7 @@ class TestCoreMetricsProcessor:
         mock_event.id = "event-123"
         mock_event.asin = "B08N5WRWNW"
         mock_event.job_id = "job-456"
-        mock_event.ingested_at = datetime.utcnow()
+        mock_event.ingested_at = datetime.now()
         mock_event.raw_data = {
             "asin": "B08N5WRWNW",
             "title": "Echo Dot (4th Gen)",

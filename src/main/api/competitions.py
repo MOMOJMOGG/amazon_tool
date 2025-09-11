@@ -140,7 +140,7 @@ async def get_competition_data(
                     peers=[PeerGap(**peer) for peer in cached_data.get("peers", [])]
                 ),
                 cached=True,
-                stale_at=datetime.utcnow()  # TODO: Calculate proper stale time
+                stale_at=datetime.now()  # TODO: Calculate proper stale time
             )
         
         record_cache_operation("competition_data", "miss")
@@ -364,7 +364,7 @@ async def refresh_competition_report(
             from datetime import timedelta
             
             async with get_db_session() as session:
-                recent_cutoff = datetime.utcnow() - timedelta(hours=6)  # 6 hours
+                recent_cutoff = datetime.now() - timedelta(hours=6)  # 6 hours
                 result = await session.execute(
                     select(CompetitionReport)
                     .where(

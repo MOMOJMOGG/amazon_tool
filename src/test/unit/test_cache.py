@@ -13,7 +13,7 @@ class TestCacheEntry:
     
     def test_cache_entry_creation(self):
         """Test CacheEntry creation and properties."""
-        now = datetime.utcnow()
+        now = datetime.now()
         entry = CacheEntry(
             data={"test": "data"}, 
             cached_at=now, 
@@ -30,7 +30,7 @@ class TestCacheEntry:
     
     def test_cache_entry_is_expired(self):
         """Test is_expired property."""
-        past_time = datetime.utcnow() - timedelta(hours=2)
+        past_time = datetime.now() - timedelta(hours=2)
         entry = CacheEntry(
             data={"test": "data"}, 
             cached_at=past_time, 
@@ -41,7 +41,7 @@ class TestCacheEntry:
     
     def test_cache_entry_is_stale(self):
         """Test is_stale property."""
-        past_time = datetime.utcnow() - timedelta(minutes=45)
+        past_time = datetime.now() - timedelta(minutes=45)
         entry = CacheEntry(
             data={"test": "data"}, 
             cached_at=past_time, 
@@ -53,7 +53,7 @@ class TestCacheEntry:
     
     def test_cache_entry_serialization(self):
         """Test to_dict and from_dict methods."""
-        now = datetime.utcnow()
+        now = datetime.now()
         entry = CacheEntry(
             data={"test": "data"}, 
             cached_at=now, 
@@ -101,7 +101,7 @@ class TestCacheService:
     async def test_cache_hit_fresh(self, cache_service, mock_redis):
         """Test cache hit with fresh data."""
         # Mock fresh cache entry
-        now = datetime.utcnow()
+        now = datetime.now()
         entry = CacheEntry(
             data={"data": "from_cache"}, 
             cached_at=now, 
@@ -127,7 +127,7 @@ class TestCacheService:
     async def test_cache_hit_stale(self, cache_service, mock_redis):
         """Test cache hit with stale data (triggers background refresh)."""
         # Mock stale cache entry
-        past_time = datetime.utcnow() - timedelta(minutes=45)
+        past_time = datetime.now() - timedelta(minutes=45)
         entry = CacheEntry(
             data={"data": "stale_from_cache"}, 
             cached_at=past_time, 
@@ -153,7 +153,7 @@ class TestCacheService:
     async def test_cache_hit_expired(self, cache_service, mock_redis):
         """Test cache hit with expired data."""
         # Mock expired cache entry
-        past_time = datetime.utcnow() - timedelta(hours=2)
+        past_time = datetime.now() - timedelta(hours=2)
         entry = CacheEntry(
             data={"data": "expired_from_cache"}, 
             cached_at=past_time, 

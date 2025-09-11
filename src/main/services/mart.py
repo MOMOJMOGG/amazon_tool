@@ -126,7 +126,7 @@ class MartProcessor:
             'first_seen_at': product.first_seen_at,
             'last_seen_at': product.last_seen_at,
             'data_quality_score': data_quality_score,
-            'last_updated': datetime.utcnow()
+            'last_updated': datetime.now()
         }
     
     async def _upsert_product_summary(self, session: AsyncSession, summary_data: Dict[str, Any]):
@@ -190,7 +190,7 @@ class MartProcessor:
                 'products_price_decrease': price_changes['price_decrease'],
                 'products_bsr_improve': price_changes['bsr_improve'],
                 'products_bsr_decline': price_changes['bsr_decline'],
-                'created_at': datetime.utcnow()
+                'created_at': datetime.now()
             }
             
             # Upsert daily aggregates
@@ -253,7 +253,7 @@ class MartProcessor:
             return {
                 'product_summaries_count': summary_count,
                 'latest_aggregates_date': latest_aggregates.date if latest_aggregates else None,
-                'last_updated': datetime.utcnow()
+                'last_updated': datetime.now()
             }
 
 

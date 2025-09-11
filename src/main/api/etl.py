@@ -246,7 +246,7 @@ async def get_etl_stats():
         return {
             "mart_layer": mart_stats,
             "workers": worker_stats,
-            "last_updated": datetime.utcnow().isoformat()
+            "last_updated": datetime.now().isoformat()
         }
         
     except Exception as e:

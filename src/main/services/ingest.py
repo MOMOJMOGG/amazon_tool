@@ -38,7 +38,7 @@ class IngestionService:
                 .where(JobExecution.job_id == job_id)
                 .values(
                     status=JobStatus.RUNNING,
-                    started_at=datetime.utcnow()
+                    started_at=datetime.now()
                 )
             )
             await session.commit()
@@ -55,7 +55,7 @@ class IngestionService:
                 .where(JobExecution.job_id == job_id)
                 .values(
                     status=status,
-                    completed_at=datetime.utcnow(),
+                    completed_at=datetime.now(),
                     records_processed=records_processed,
                     records_failed=records_failed,
                     error_message=error_message
@@ -133,7 +133,7 @@ class IngestionService:
             result = await session.execute(
                 update(RawProductEvent)
                 .where(RawProductEvent.id.in_(event_ids))
-                .values(processed_at=datetime.utcnow())
+                .values(processed_at=datetime.now())
             )
             await session.commit()
             return result.rowcount

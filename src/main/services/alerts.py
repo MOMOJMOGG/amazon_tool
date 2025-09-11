@@ -155,7 +155,7 @@ class AlertService:
                             rule.alert_type, asin, current_price, 
                             previous_price, price_change_pct
                         ),
-                        'created_at': datetime.utcnow()
+                        'created_at': datetime.now()
                     }
                     alerts.append(alert_data)
         
@@ -193,7 +193,7 @@ class AlertService:
                             rule.alert_type, asin, current_bsr, 
                             previous_bsr, bsr_change_pct
                         ),
-                        'created_at': datetime.utcnow()
+                        'created_at': datetime.now()
                     }
                     alerts.append(alert_data)
         
@@ -250,7 +250,7 @@ class AlertService:
                 .where(PriceAlerts.id == alert_id)
                 .values(
                     is_resolved="true",
-                    resolved_at=datetime.utcnow(),
+                    resolved_at=datetime.now(),
                     resolved_by=resolved_by
                 )
             )
@@ -259,7 +259,7 @@ class AlertService:
     
     async def get_alert_summary(self, days: int = 7) -> Dict[str, Any]:
         """Get alert summary statistics for the last N days."""
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        cutoff_date = datetime.now() - timedelta(days=days)
         
         async with get_db_session() as session:
             from sqlalchemy import func

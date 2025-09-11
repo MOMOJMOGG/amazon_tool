@@ -142,7 +142,7 @@ class ApifyDataLoader:
         }
         
         # Create raw event ID
-        event_id = f"apify_{asin}_{int(datetime.utcnow().timestamp())}"
+        event_id = f"apify_{asin}_{int(datetime.now().timestamp())}"
         
         # Create raw product event
         raw_event = RawProductEvent(
@@ -152,7 +152,7 @@ class ApifyDataLoader:
             event_type="product_update",
             raw_data=event_data,
             job_id=job_id,
-            ingested_at=datetime.utcnow()
+            ingested_at=datetime.now()
         )
         
         async with get_db_session() as session:
@@ -234,7 +234,7 @@ class ApifyDataLoader:
             raise ValueError("Review missing ASIN or reviewId")
             
         # Create raw event ID
-        event_id = f"apify_review_{review_id}_{int(datetime.utcnow().timestamp())}"
+        event_id = f"apify_review_{review_id}_{int(datetime.now().timestamp())}"
         
         # Create raw review event
         raw_event = RawProductEvent(
@@ -244,7 +244,7 @@ class ApifyDataLoader:
             event_type="review_data",
             raw_data=review_data,
             job_id=job_id,
-            ingested_at=datetime.utcnow()
+            ingested_at=datetime.now()
         )
         
         async with get_db_session() as session:

@@ -23,7 +23,7 @@ class TestCompetitorLink:
         link = CompetitorLink(
             asin_main="B0FDKB341G",
             asin_comp="B0F6BJSTSQ",
-            created_at=datetime.utcnow()
+            created_at=datetime.now()
         )
         
         assert link.asin_main == "B0FDKB341G"
@@ -248,7 +248,7 @@ class TestRealDataIntegration:
         link = CompetitorLink(
             asin_main=self.REAL_MAIN_ASIN,
             asin_comp=self.REAL_COMP_ASIN,
-            created_at=datetime.utcnow()
+            created_at=datetime.now()
         )
         
         assert link.asin_main == self.REAL_MAIN_ASIN

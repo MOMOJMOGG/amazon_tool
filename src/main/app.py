@@ -243,7 +243,7 @@ async def health_check() -> Dict[str, Any]:
         
         return {
             "status": status,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now().isoformat(),
             "version": "1.0.0",
             "environment": settings.environment,
             "services": {
