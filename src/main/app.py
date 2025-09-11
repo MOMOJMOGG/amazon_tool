@@ -4,17 +4,66 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import logging
+import logging.handlers
 import asyncio
+import os
 from datetime import datetime
 from typing import Dict, Any
 
 from src.main.config import settings
 
-# Configure logging
-logging.basicConfig(
-    level=getattr(logging, settings.log_level.upper()),
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-)
+# Configure structured logging with file handlers
+def setup_logging():
+    """Setup structured logging with file rotation."""
+    # Create logs directory if it doesn't exist
+    log_dir = settings.log_dir
+    os.makedirs(log_dir, exist_ok=True)
+    
+    # Create root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(getattr(logging, settings.log_level.upper()))
+    
+    # Clear existing handlers
+    root_logger.handlers.clear()
+    
+    # Create formatter
+    formatter = logging.Formatter(settings.log_format)
+    
+    # Console handler for development
+    if settings.environment == "development":
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+        console_handler.setLevel(logging.INFO)
+        root_logger.addHandler(console_handler)
+    
+    # File handler for all logs with rotation
+    app_log_path = os.path.join(log_dir, settings.log_file)
+    file_handler = logging.handlers.RotatingFileHandler(
+        app_log_path,
+        maxBytes=settings.log_max_size,
+        backupCount=settings.log_backup_count,
+        encoding='utf-8'
+    )
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(logging.INFO)
+    root_logger.addHandler(file_handler)
+    
+    # Error-only file handler
+    error_log_path = os.path.join(log_dir, settings.error_log_file)
+    error_handler = logging.handlers.RotatingFileHandler(
+        error_log_path,
+        maxBytes=settings.log_max_size,
+        backupCount=settings.log_backup_count,
+        encoding='utf-8'
+    )
+    error_handler.setFormatter(formatter)
+    error_handler.setLevel(logging.ERROR)
+    root_logger.addHandler(error_handler)
+    
+    return root_logger
+
+# Setup logging
+setup_logging()
 logger = logging.getLogger(__name__)
 
 # Create FastAPI application
@@ -36,14 +85,18 @@ app.add_middleware(
 )
 
 # Add M4 middleware (order matters - add in reverse order of execution)
+rate_limit_middleware = None
 try:
     from src.main.middleware.etag import ETagMiddleware
-    from src.main.middleware.rate_limit import RateLimitMiddleware, create_rate_limiter
+    from src.main.middleware.rate_limit import RateLimitMiddleware
     
     # Add ETag middleware (first to execute, last to process response)
     app.add_middleware(ETagMiddleware, paths_to_include=['/v1/products/', '/v1/competitions/'])
     
-    # Rate limiting will be added during startup after Redis is initialized
+    # Create rate limiting middleware instance - Redis will be configured during startup
+    rate_limit_middleware = RateLimitMiddleware
+    app.add_middleware(rate_limit_middleware, redis_client=None)
+    
     logger.info("M4 middleware configured")
 except ImportError as e:
     logger.warning(f"Could not import M4 middleware: {e}")
@@ -126,11 +179,18 @@ async def startup_event():
             await cache.start_invalidation_listener()
             logger.info("Cache invalidation listener started")
             
-            # Add rate limiting middleware
-            from src.main.middleware.rate_limit import RateLimitMiddleware, create_rate_limiter
+            # Initialize Redis for rate limiting middleware
+            from src.main.middleware.rate_limit import create_rate_limiter
             rate_limiter = await create_rate_limiter()
-            app.add_middleware(RateLimitMiddleware, redis_client=rate_limiter.redis_client if rate_limiter else None)
-            logger.info("Rate limiting middleware added")
+            # Update the middleware with Redis client using reflection
+            for middleware in app.user_middleware:
+                if hasattr(middleware, 'cls') and middleware.cls.__name__ == 'RateLimitMiddleware':
+                    # Get the actual middleware instance from the stack
+                    middleware_instance = middleware.kwargs.get('dispatch') or middleware
+                    if hasattr(middleware_instance, 'set_redis_client'):
+                        middleware_instance.set_redis_client(rate_limiter.redis_client if rate_limiter else None)
+                    break
+            logger.info("Rate limiting Redis connection initialized")
             
         except Exception as e:
             logger.warning(f"Could not initialize M4 features: {e}")

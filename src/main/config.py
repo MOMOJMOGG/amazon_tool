@@ -28,6 +28,14 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     environment: str = "development"
     
+    # Logging Configuration
+    log_dir: str = "logs"
+    log_file: str = "app.log"
+    error_log_file: str = "error.log"
+    log_max_size: int = 10 * 1024 * 1024  # 10MB
+    log_backup_count: int = 5
+    log_format: str = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    
     # API Configuration
     api_host: str = "0.0.0.0"
     api_port: int = 8000

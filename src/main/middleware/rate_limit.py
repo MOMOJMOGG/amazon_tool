@@ -146,6 +146,10 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.rate_limiter = RateLimiter(redis_client)
         self.rules = rules or self._default_rules()
     
+    def set_redis_client(self, redis_client):
+        """Update Redis client after initialization."""
+        self.rate_limiter.redis_client = redis_client
+    
     def _default_rules(self) -> Dict[str, RateLimitRule]:
         """Default rate limiting rules."""
         return {
