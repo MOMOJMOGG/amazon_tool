@@ -2,63 +2,29 @@
 
 from datetime import datetime, date
 from typing import Optional, List
-from sqlalchemy import Column, String, DateTime, Numeric, Integer, Text, Date, ForeignKey, JSON
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey
 from pydantic import BaseModel, Field
 
 from src.main.database import Base
 
 
 class CompetitorLink(Base):
-    """Competitor relationship SQLAlchemy model."""
-    
+    """Competitor relationship SQLAlchemy model matching Supabase schema."""
+
     __tablename__ = "competitor_links"
     __table_args__ = {"schema": "core"}
-    
-    asin_main = Column(String, primary_key=True, index=True)
-    asin_comp = Column(String, primary_key=True, index=True)
+
+    asin_main = Column(String, ForeignKey('core.products.asin', ondelete='CASCADE'), primary_key=True)
+    asin_comp = Column(String, ForeignKey('core.products.asin', ondelete='CASCADE'), primary_key=True)
+    is_active = Column(Boolean, nullable=False, default=True)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
+
     def __repr__(self):
-        return f"<CompetitorLink(main='{self.asin_main}', comp='{self.asin_comp}')>"
+        return f"<CompetitorLink(main='{self.asin_main}', comp='{self.asin_comp}', active={self.is_active})>"
 
 
-class CompetitorComparisonDaily(Base):
-    """Daily competitor comparison SQLAlchemy model."""
-    
-    __tablename__ = "competitor_comparison_daily"
-    __table_args__ = {"schema": "mart"}
-    
-    asin_main = Column(String, primary_key=True, index=True)
-    asin_comp = Column(String, primary_key=True, index=True)
-    date = Column(Date, primary_key=True, index=True)
-    price_diff = Column(Numeric(10, 2), nullable=True)
-    bsr_gap = Column(Integer, nullable=True)
-    rating_diff = Column(Numeric(3, 2), nullable=True)
-    reviews_gap = Column(Integer, nullable=True)
-    buybox_diff = Column(Numeric(10, 2), nullable=True)
-    extras = Column(JSONB, nullable=True)
-    
-    def __repr__(self):
-        return f"<CompetitorComparisonDaily(main='{self.asin_main}', comp='{self.asin_comp}', date='{self.date}')>"
-
-
-class CompetitionReport(Base):
-    """Competition report SQLAlchemy model."""
-    
-    __tablename__ = "competition_reports"
-    __table_args__ = {"schema": "mart"}
-    
-    id = Column(Integer, primary_key=True)
-    asin_main = Column(String, index=True, nullable=False)
-    version = Column(Integer, nullable=False)
-    summary = Column(JSONB, nullable=False)
-    evidence = Column(JSONB, nullable=True)
-    model = Column(String, nullable=True)
-    generated_at = Column(DateTime, default=datetime.utcnow)
-    
-    def __repr__(self):
-        return f"<CompetitionReport(asin='{self.asin_main}', version={self.version})>"
+# CompetitorComparisonDaily and CompetitionReports models moved to src.main.models.mart
+# to align with Supabase schema and avoid duplicate table definitions
 
 
 # Pydantic models for API requests/responses
