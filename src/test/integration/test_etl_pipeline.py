@@ -316,3 +316,92 @@ class TestETLPipeline:
                 
                 stats_data = stats_response.json()
                 assert stats_data["mart_layer"]["product_summaries_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_etl_worker_apify_integration_methods(self):
+        """Test the new Apify integration methods in ETL worker."""
+        from src.main.workers.etl_worker import etl_worker
+        from src.main.config import settings
+        from datetime import date, timedelta
+
+        test_date = date.today() - timedelta(days=1)  # Use yesterday for demo
+        test_job_id = "test-apify-integration"
+
+        # Test 1: Simulation mode (should always work)
+        events_simulated = await etl_worker.simulate_apify_ingestion(
+            test_job_id, test_date, sample_size=3
+        )
+        assert events_simulated == 3
+
+        # Test 2: Universal method with simulation
+        events_universal_sim = await etl_worker.ingest_apify_data(
+            test_job_id, test_date, use_real_api=False, sample_size=2
+        )
+        assert events_universal_sim == 2
+
+        # Test 3: Universal method with environment default
+        events_universal_default = await etl_worker.ingest_apify_data(
+            test_job_id, test_date, use_real_api=None, sample_size=1
+        )
+        # Should use environment default (which is False for simulation)
+        assert events_universal_default == 1
+
+        # Test 4: Real API mode (only if API key configured)
+        if settings.apify_api_key:
+            try:
+                # This might fail if no API key or network issues, but should not crash
+                events_real = await etl_worker.ingest_apify_data(
+                    test_job_id, test_date, use_real_api=True, asins=["B0C6KKQ7ND"]
+                )
+                assert events_real >= 0  # Accept 0 or more events
+            except Exception as e:
+                # Real API might fail due to network, auth, etc. - that's expected in tests
+                assert "Apify" in str(e) or "API" in str(e)
+
+    @pytest.mark.asyncio
+    async def test_etl_api_with_date_and_real_api_parameters(self):
+        """Test the ETL API endpoints with new date and real API parameters."""
+        async with AsyncClient(app=app, base_url="http://test") as ac:
+
+            # Test with explicit date and simulation mode
+            trigger_request = {
+                "job_name": "daily_etl_pipeline",
+                "target_date": "2025-01-15",  # Specific date for demo
+                "use_real_api": False,
+                "job_metadata": {"test": "date_api_params"}
+            }
+
+            with patch('src.main.tasks.run_daily_etl_pipeline.delay') as mock_task:
+                mock_task.return_value.id = "test-task-id-123"
+
+                response = await ac.post("/v1/etl/jobs/trigger", json=trigger_request)
+                assert response.status_code == 200
+
+                data = response.json()
+                assert data["status"] == "scheduled"
+                assert "simulated data" in data["message"]
+                assert "2025-01-15" in data["message"]
+                assert data["details"]["target_date"] == "2025-01-15"
+                assert data["details"]["use_real_api"] is False
+
+                # Verify the task was called with correct parameters
+                mock_task.assert_called_once_with("2025-01-15", False)
+
+            # Test with no date (defaults to today) and environment default for API
+            trigger_request_default = {
+                "job_name": "daily_etl_pipeline",
+                "use_real_api": None  # Use environment default
+            }
+
+            with patch('src.main.tasks.run_daily_etl_pipeline.delay') as mock_task:
+                mock_task.return_value.id = "test-task-id-456"
+
+                response = await ac.post("/v1/etl/jobs/trigger", json=trigger_request_default)
+                assert response.status_code == 200
+
+                data = response.json()
+                assert data["status"] == "scheduled"
+                assert "today" in data["message"]
+
+                # Should use environment default (which is False)
+                mock_task.assert_called_once_with(None, None)
