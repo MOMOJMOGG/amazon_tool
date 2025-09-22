@@ -220,24 +220,55 @@ class ApifyDataMapper:
 
 
     @staticmethod
-    def extract_features_for_table(apify_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-        """Extract features from features array for storage in product_features table."""
+    def extract_features_for_supabase(apify_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract features as JSONB for Supabase core.product_features table."""
         asin = apify_data.get('asin')
         features = apify_data.get('features', [])
 
-        if not asin or not features:
-            return []
+        if not asin:
+            return {}
 
-        feature_records = []
-        for index, feature_text in enumerate(features):
-            if feature_text and isinstance(feature_text, str):
-                feature_records.append({
-                    'asin': asin,
-                    'feature_text': feature_text.strip(),
-                    'order_index': index + 1  # 1-based indexing
-                })
+        # Extract bullets (feature list) as JSONB array
+        bullets = []
+        if features and isinstance(features, list):
+            for feature_text in features:
+                if feature_text and isinstance(feature_text, str):
+                    bullets.append(feature_text.strip())
 
-        return feature_records
+        # Extract attributes from productDetails for JSONB
+        attributes = {}
+        product_details = apify_data.get('productDetails', [])
+        if isinstance(product_details, list):
+            for detail in product_details:
+                if isinstance(detail, dict) and 'name' in detail and 'value' in detail:
+                    name = detail['name']
+                    value = detail['value']
+                    # Skip BSR as it's handled separately
+                    if name != 'Best Sellers Rank':
+                        attributes[name] = value
+
+        # Additional attributes from main fields
+        additional_attrs = {
+            'brand': apify_data.get('manufacturer'),
+            'countReview': apify_data.get('countReview'),
+            'productRating': apify_data.get('productRating'),
+            'retailPrice': apify_data.get('retailPrice'),
+            'priceSaving': apify_data.get('priceSaving'),
+            'warehouseAvailability': apify_data.get('warehouseAvailability'),
+            'soldBy': apify_data.get('soldBy'),
+            'fulfilledBy': apify_data.get('fulfilledBy')
+        }
+
+        # Add non-null additional attributes
+        for key, value in additional_attrs.items():
+            if value is not None:
+                attributes[key] = value
+
+        return {
+            'asin': asin,
+            'bullets': bullets if bullets else None,
+            'attributes': attributes if attributes else None
+        }
 
 
 def create_mapped_event_data(apify_data: Dict[str, Any], event_type: str = "product_update") -> Dict[str, Any]:
@@ -251,6 +282,6 @@ def create_mapped_event_data(apify_data: Dict[str, Any], event_type: str = "prod
         return apify_data
 
 
-def extract_features_for_database(apify_data: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Helper function to extract features for database insertion."""
-    return ApifyDataMapper.extract_features_for_table(apify_data)
+def extract_features_for_database(apify_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Helper function to extract features for Supabase database insertion."""
+    return ApifyDataMapper.extract_features_for_supabase(apify_data)

@@ -1,19 +1,20 @@
 """Product data models."""
 
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional, List, Union
-from sqlalchemy import Column, String, DateTime, Numeric, Integer, Text
+from sqlalchemy import Column, String, DateTime, Numeric, Integer, Text, Date, ForeignKey
+from sqlalchemy.dialects.postgresql import JSONB
 from pydantic import BaseModel, Field, validator
 
 from src.main.database import Base
 
 
 class Product(Base):
-    """Product SQLAlchemy model."""
-    
+    """Product SQLAlchemy model matching Supabase schema."""
+
     __tablename__ = "products"
     __table_args__ = {"schema": "core"}
-    
+
     asin = Column(String, primary_key=True, index=True)
     title = Column(String, nullable=False)
     brand = Column(String, nullable=True)
@@ -21,29 +22,45 @@ class Product(Base):
     image_url = Column(Text, nullable=True)
     first_seen_at = Column(DateTime, default=datetime.utcnow)
     last_seen_at = Column(DateTime, nullable=True)
+    source_meta = Column(JSONB, nullable=True)
     
     def __repr__(self):
         return f"<Product(asin='{self.asin}', title='{self.title}')>"
 
 
 class ProductMetricsDaily(Base):
-    """Daily product metrics SQLAlchemy model."""
-    
+    """Daily product metrics SQLAlchemy model matching Supabase schema."""
+
     __tablename__ = "product_metrics_daily"
     __table_args__ = {"schema": "core"}
-    
-    asin = Column(String, primary_key=True, index=True)
-    date = Column(DateTime, primary_key=True, index=True)
+
+    asin = Column(String, ForeignKey('core.products.asin', ondelete='CASCADE'), primary_key=True, index=True)
+    date = Column(Date, primary_key=True, index=True)  # Fixed: Date instead of DateTime
     price = Column(Numeric(10, 2), nullable=True)
     bsr = Column(Integer, nullable=True)
     rating = Column(Numeric(2, 1), nullable=True)
     reviews_count = Column(Integer, nullable=True)
     buybox_price = Column(Numeric(10, 2), nullable=True)
-    job_id = Column(String, nullable=True)
+    job_id = Column(String, ForeignKey('core.ingest_runs.job_id', ondelete='SET NULL'), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     def __repr__(self):
         return f"<ProductMetricsDaily(asin='{self.asin}', date='{self.date}')>"
+
+
+class ProductFeatures(Base):
+    """Product features SQLAlchemy model matching Supabase schema."""
+
+    __tablename__ = "product_features"
+    __table_args__ = {"schema": "core"}
+
+    asin = Column(String, ForeignKey('core.products.asin', ondelete='CASCADE'), primary_key=True)
+    bullets = Column(JSONB, nullable=True)  # Feature bullet points as JSONB
+    attributes = Column(JSONB, nullable=True)  # Product attributes as JSONB
+    extracted_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<ProductFeatures(asin='{self.asin}')>"
 
 
 # Pydantic models for API responses
@@ -64,6 +81,8 @@ class ProductWithMetrics(ProductBase):
     latest_reviews_count: Optional[int] = Field(None, description="Latest review count")
     latest_buybox_price: Optional[float] = Field(None, description="Latest buybox price")
     last_updated: Optional[datetime] = Field(None, description="Last metrics update")
+    bullets: Optional[List[str]] = Field(None, description="Product feature bullets")
+    attributes: Optional[dict] = Field(None, description="Product attributes")
     
     class Config:
         from_attributes = True

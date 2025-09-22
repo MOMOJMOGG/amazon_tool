@@ -1,175 +1,174 @@
-"""Mart layer models for pre-computed analytics tables."""
+"""Mart layer models matching actual Supabase schema."""
 
 from datetime import datetime, date
-from typing import Optional
-from sqlalchemy import Column, String, DateTime, Numeric, Integer, Date, Text, Index
+from typing import Optional, List
+from sqlalchemy import Column, String, DateTime, Numeric, Integer, Date, Text, Index, ForeignKey
+from sqlalchemy.dialects.postgresql import JSONB
 from pydantic import BaseModel, Field
 
 from src.main.database import Base
 
 
-class ProductSummary(Base):
-    """Pre-computed product summary for fast API responses."""
-    
-    __tablename__ = "product_summary"
+class ProductMetricsRollup(Base):
+    """Rolling aggregates table matching Supabase mart.product_metrics_rollup."""
+
+    __tablename__ = "product_metrics_rollup"
     __table_args__ = (
-        Index("idx_product_summary_asin", "asin"),
-        Index("idx_product_summary_updated", "last_updated"),
+        Index("idx_rollup_asin_duration", "asin", "duration"),
         {"schema": "mart"}
     )
-    
-    asin = Column(String, primary_key=True, index=True)
-    title = Column(String, nullable=False)
-    brand = Column(String, nullable=True)
-    category = Column(String, nullable=True)
-    image_url = Column(Text, nullable=True)
-    
-    # Latest metrics (for quick API responses)
-    latest_price = Column(Numeric(10, 2), nullable=True)
-    latest_bsr = Column(Integer, nullable=True)
-    latest_rating = Column(Numeric(2, 1), nullable=True)
-    latest_reviews_count = Column(Integer, nullable=True)
-    latest_buybox_price = Column(Numeric(10, 2), nullable=True)
-    latest_metrics_date = Column(Date, nullable=True)
-    
-    # 30-day aggregates
-    avg_price_30d = Column(Numeric(10, 2), nullable=True)
-    min_price_30d = Column(Numeric(10, 2), nullable=True)
-    max_price_30d = Column(Numeric(10, 2), nullable=True)
-    avg_bsr_30d = Column(Numeric(10, 2), nullable=True)
-    price_change_30d_pct = Column(Numeric(5, 2), nullable=True)
-    bsr_change_30d_pct = Column(Numeric(5, 2), nullable=True)
-    
-    # Metadata
-    first_seen_at = Column(DateTime, nullable=True)
-    last_seen_at = Column(DateTime, nullable=True)
-    last_updated = Column(DateTime, default=datetime.utcnow, index=True)
-    data_quality_score = Column(Numeric(3, 2), nullable=True)  # 0-1 score
-    
+
+    asin = Column(String, ForeignKey('core.products.asin', ondelete='CASCADE'), primary_key=True)
+    duration = Column(String, primary_key=True)  # '7d', '30d', '90d'
+    as_of = Column(Date, primary_key=True)
+    price_avg = Column(Numeric(10, 2), nullable=True)
+    price_min = Column(Numeric(10, 2), nullable=True)
+    price_max = Column(Numeric(10, 2), nullable=True)
+    bsr_avg = Column(Numeric(12, 2), nullable=True)
+    rating_avg = Column(Numeric(3, 2), nullable=True)
+    reviews_delta = Column(Integer, nullable=True)
+    price_change_pct = Column(Numeric(6, 2), nullable=True)
+    bsr_change_pct = Column(Numeric(6, 2), nullable=True)
+
     def __repr__(self):
-        return f"<ProductSummary(asin='{self.asin}', title='{self.title}')>"
+        return f"<ProductMetricsRollup(asin='{self.asin}', duration='{self.duration}')>"
 
 
-class DailyAggregates(Base):
-    """Daily aggregated metrics across all products."""
-    
-    __tablename__ = "daily_aggregates"
+class ProductMetricsDeltaDaily(Base):
+    """Day-over-day deltas table matching Supabase mart.product_metrics_delta_daily."""
+
+    __tablename__ = "product_metrics_delta_daily"
     __table_args__ = (
-        Index("idx_daily_aggregates_date", "date"),
+        Index("idx_delta_asin_date", "asin", "date"),
         {"schema": "mart"}
     )
-    
-    date = Column(Date, primary_key=True, index=True)
-    
-    # Product counts
-    total_products = Column(Integer, default=0)
-    products_with_price = Column(Integer, default=0)
-    products_with_bsr = Column(Integer, default=0)
-    new_products = Column(Integer, default=0)
-    
-    # Price statistics
-    avg_price = Column(Numeric(10, 2), nullable=True)
-    median_price = Column(Numeric(10, 2), nullable=True)
-    price_std_dev = Column(Numeric(10, 2), nullable=True)
-    
-    # BSR statistics  
-    avg_bsr = Column(Numeric(10, 2), nullable=True)
-    median_bsr = Column(Integer, nullable=True)
-    
-    # Change detection
-    products_price_increase = Column(Integer, default=0)
-    products_price_decrease = Column(Integer, default=0)
-    products_bsr_improve = Column(Integer, default=0)  # Lower BSR = better
-    products_bsr_decline = Column(Integer, default=0)
-    
-    # Data freshness
-    avg_data_age_hours = Column(Numeric(5, 1), nullable=True)
-    job_success_rate = Column(Numeric(3, 2), nullable=True)
-    
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
+
+    asin = Column(String, ForeignKey('core.products.asin', ondelete='CASCADE'), primary_key=True)
+    date = Column(Date, primary_key=True)
+    price_delta = Column(Numeric(10, 2), nullable=True)
+    price_change_pct = Column(Numeric(6, 2), nullable=True)
+    bsr_delta = Column(Integer, nullable=True)
+    bsr_change_pct = Column(Numeric(6, 2), nullable=True)
+    rating_delta = Column(Numeric(3, 2), nullable=True)
+    reviews_delta = Column(Integer, nullable=True)
+    buybox_delta = Column(Numeric(10, 2), nullable=True)
+
     def __repr__(self):
-        return f"<DailyAggregates(date='{self.date}', total_products={self.total_products})>"
+        return f"<ProductMetricsDeltaDaily(asin='{self.asin}', date='{self.date}')>"
 
 
-class PriceAlerts(Base):
-    """Price and BSR anomaly alerts."""
-    
-    __tablename__ = "price_alerts"
+class CompetitorComparisonDaily(Base):
+    """Competition daily diffs matching Supabase mart.competitor_comparison_daily."""
+
+    __tablename__ = "competitor_comparison_daily"
     __table_args__ = (
-        Index("idx_price_alerts_asin", "asin"),
-        Index("idx_price_alerts_created", "created_at"),
-        Index("idx_price_alerts_resolved", "resolved_at"),
+        Index("idx_comp_daily_main_date", "asin_main", "date"),
         {"schema": "mart"}
     )
-    
-    id = Column(String, primary_key=True)
-    asin = Column(String, nullable=False, index=True)
-    alert_type = Column(String, nullable=False)  # "price_spike", "price_drop", "bsr_jump", etc.
-    severity = Column(String, nullable=False)    # "low", "medium", "high", "critical"
-    
-    # Alert details
-    current_value = Column(Numeric(10, 2), nullable=True)
-    previous_value = Column(Numeric(10, 2), nullable=True)
-    change_percent = Column(Numeric(5, 2), nullable=True)
-    threshold_exceeded = Column(Numeric(5, 2), nullable=True)
-    
-    # Context
-    baseline_value = Column(Numeric(10, 2), nullable=True)  # 30-day average
-    message = Column(Text, nullable=True)
-    alert_metadata = Column(Text, nullable=True)  # JSON string with additional context
-    
-    # Status tracking
-    is_resolved = Column(String, default="false")  # "true"/"false" as string for compatibility
-    resolved_at = Column(DateTime, nullable=True)
-    resolved_by = Column(String, nullable=True)  # job_id or user_id
-    
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
-    
+
+    asin_main = Column(String, ForeignKey('core.products.asin', ondelete='CASCADE'), primary_key=True)
+    asin_comp = Column(String, ForeignKey('core.products.asin', ondelete='CASCADE'), primary_key=True)
+    date = Column(Date, primary_key=True)
+    price_diff = Column(Numeric(10, 2), nullable=True)
+    bsr_gap = Column(Integer, nullable=True)
+    rating_diff = Column(Numeric(3, 2), nullable=True)
+    reviews_gap = Column(Integer, nullable=True)
+    buybox_diff = Column(Numeric(10, 2), nullable=True)
+    extras = Column(JSONB, nullable=True)
+
     def __repr__(self):
-        return f"<PriceAlert(id='{self.id}', asin='{self.asin}', type='{self.alert_type}')>"
+        return f"<CompetitorComparisonDaily(main='{self.asin_main}', comp='{self.asin_comp}', date='{self.date}')>"
+
+
+class CompetitionReports(Base):
+    """LLM competition reports matching Supabase mart.competition_reports."""
+
+    __tablename__ = "competition_reports"
+    __table_args__ = (
+        Index("idx_reports_asin_version", "asin_main", "version"),
+        {"schema": "mart"}
+    )
+
+    id = Column(Integer, primary_key=True)
+    asin_main = Column(String, ForeignKey('core.products.asin', ondelete='CASCADE'), nullable=False)
+    version = Column(Integer, nullable=False)
+    summary = Column(JSONB, nullable=False)
+    evidence = Column(JSONB, nullable=True)
+    model = Column(String, nullable=True)
+    generated_at = Column(DateTime, default=datetime.utcnow)
+
+    def __repr__(self):
+        return f"<CompetitionReports(asin='{self.asin_main}', version={self.version})>"
 
 
 # Pydantic models for API responses
-class ProductSummaryResponse(BaseModel):
-    """Product summary API response model."""
+class ProductMetricsRollupResponse(BaseModel):
+    """Product metrics rollup API response model."""
     asin: str
-    title: str
-    brand: Optional[str]
-    category: Optional[str]
-    image_url: Optional[str]
-    latest_price: Optional[float]
-    latest_bsr: Optional[int]
-    latest_rating: Optional[float]
-    latest_reviews_count: Optional[int]
-    latest_buybox_price: Optional[float]
-    latest_metrics_date: Optional[date]
-    avg_price_30d: Optional[float]
-    price_change_30d_pct: Optional[float]
-    bsr_change_30d_pct: Optional[float]
-    last_updated: datetime
-    
+    duration: str
+    as_of: date
+    price_avg: Optional[float]
+    price_min: Optional[float]
+    price_max: Optional[float]
+    bsr_avg: Optional[float]
+    rating_avg: Optional[float]
+    reviews_delta: Optional[int]
+    price_change_pct: Optional[float]
+    bsr_change_pct: Optional[float]
+
     class Config:
         from_attributes = True
 
 
-class DailyAggregatesResponse(BaseModel):
-    """Daily aggregates API response model."""
+class ProductMetricsDeltaResponse(BaseModel):
+    """Product metrics delta API response model."""
+    asin: str
     date: date
-    total_products: int
-    products_with_price: int
-    new_products: int
-    avg_price: Optional[float]
-    avg_bsr: Optional[float]
-    products_price_increase: int
-    products_price_decrease: int
-    
+    price_delta: Optional[float]
+    price_change_pct: Optional[float]
+    bsr_delta: Optional[int]
+    bsr_change_pct: Optional[float]
+    rating_delta: Optional[float]
+    reviews_delta: Optional[int]
+    buybox_delta: Optional[float]
+
     class Config:
         from_attributes = True
 
 
+class CompetitorComparisonResponse(BaseModel):
+    """Competitor comparison API response model."""
+    asin_main: str
+    asin_comp: str
+    date: date
+    price_diff: Optional[float]
+    bsr_gap: Optional[int]
+    rating_diff: Optional[float]
+    reviews_gap: Optional[int]
+    buybox_diff: Optional[float]
+    extras: Optional[dict]
+
+    class Config:
+        from_attributes = True
+
+
+class CompetitionReportResponse(BaseModel):
+    """Competition report API response model."""
+    id: int
+    asin_main: str
+    version: int
+    summary: dict
+    evidence: Optional[dict]
+    model: Optional[str]
+    generated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Legacy response models for backward compatibility
 class PriceAlertResponse(BaseModel):
-    """Price alert API response model."""
+    """Legacy price alert response - maps to core.alerts."""
     id: str
     asin: str
     alert_type: str
@@ -180,6 +179,18 @@ class PriceAlertResponse(BaseModel):
     message: Optional[str]
     is_resolved: str
     created_at: datetime
-    
+
     class Config:
         from_attributes = True
+
+
+# Materialized view representation (for documentation)
+class MVProductLatest:
+    """Represents the mart.mv_product_latest materialized view.
+
+    This is managed directly in Supabase SQL and refreshed via:
+    REFRESH MATERIALIZED VIEW CONCURRENTLY mart.mv_product_latest;
+
+    Columns: asin, date, price, bsr, rating, reviews_count, buybox_price
+    """
+    pass

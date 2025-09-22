@@ -1,261 +1,289 @@
-"""Mart layer service for pre-computed analytics tables."""
+"""Mart layer population service for analytics and reporting."""
 
 from datetime import datetime, date, timedelta
-from typing import Dict, Any, List, Optional, Tuple
-from sqlalchemy import select, func, update, delete, text
+from typing import Dict, Any, List, Optional
+from sqlalchemy import select, insert, update, text, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
-import uuid
 import logging
 
 from src.main.database import get_db_session
 from src.main.models.product import Product, ProductMetricsDaily
-from src.main.models.mart import ProductSummary, DailyAggregates, PriceAlerts
+from src.main.models.mart import (
+    ProductMetricsRollup, ProductMetricsDeltaDaily,
+    CompetitorComparisonDaily, CompetitionReports
+)
 
 logger = logging.getLogger(__name__)
 
 
-class MartProcessor:
-    """Process core data into mart layer for fast API responses."""
-    
-    async def refresh_product_summaries(self, date_filter: Optional[date] = None) -> int:
-        """
-        Refresh product summary table with latest metrics and 30-day aggregates.
-        Returns number of products updated.
-        """
-        target_date = date_filter or date.today()
-        thirty_days_ago = target_date - timedelta(days=30)
-        
-        logger.info(f"Refreshing product summaries for {target_date}")
-        
+class MartService:
+    """Service for populating mart layer tables."""
+
+    async def refresh_materialized_view(self) -> bool:
+        """Refresh the materialized view for latest product data."""
+        try:
+            async with get_db_session() as session:
+                await session.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY mart.mv_product_latest"))
+                await session.commit()
+                logger.info("Successfully refreshed mart.mv_product_latest materialized view")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to refresh materialized view: {e}")
+            return False
+
+    async def populate_metrics_rollups(self, as_of_date: Optional[date] = None) -> int:
+        """Populate product metrics rollups for different time periods."""
+        if as_of_date is None:
+            as_of_date = date.today()
+
+        records_created = 0
+        durations = ['7d', '30d', '90d']
+
         async with get_db_session() as session:
-            # Get all products that have metrics data
-            products_query = select(Product).where(
-                Product.asin.in_(
-                    select(ProductMetricsDaily.asin).distinct()
-                )
-            )
-            result = await session.execute(products_query)
-            products = result.scalars().all()
-            
-            updated_count = 0
-            
-            for product in products:
-                try:
-                    summary_data = await self._compute_product_summary(
-                        session, product, target_date, thirty_days_ago
-                    )
-                    await self._upsert_product_summary(session, summary_data)
-                    updated_count += 1
-                except Exception as e:
-                    logger.error(f"Failed to update summary for {product.asin}: {e}")
-            
+            for duration in durations:
+                days = int(duration[:-1])
+                start_date = as_of_date - timedelta(days=days)
+
+                # Calculate rollup metrics
+                rollup_query = text("""
+                    INSERT INTO mart.product_metrics_rollup
+                    (asin, duration, as_of, price_avg, price_min, price_max, bsr_avg, rating_avg, reviews_delta, price_change_pct, bsr_change_pct)
+                    SELECT
+                        asin,
+                        :duration,
+                        :as_of_date,
+                        ROUND(AVG(price)::numeric, 2) as price_avg,
+                        ROUND(MIN(price)::numeric, 2) as price_min,
+                        ROUND(MAX(price)::numeric, 2) as price_max,
+                        ROUND(AVG(bsr)::numeric, 2) as bsr_avg,
+                        ROUND(AVG(rating)::numeric, 2) as rating_avg,
+                        MAX(reviews_count) - MIN(reviews_count) as reviews_delta,
+                        CASE
+                            WHEN LAG(AVG(price)) OVER (PARTITION BY asin ORDER BY MIN(date)) IS NOT NULL
+                            THEN ROUND(((AVG(price) - LAG(AVG(price)) OVER (PARTITION BY asin ORDER BY MIN(date))) /
+                                      LAG(AVG(price)) OVER (PARTITION BY asin ORDER BY MIN(date)) * 100)::numeric, 2)
+                            ELSE NULL
+                        END as price_change_pct,
+                        CASE
+                            WHEN LAG(AVG(bsr)) OVER (PARTITION BY asin ORDER BY MIN(date)) IS NOT NULL
+                            THEN ROUND(((AVG(bsr) - LAG(AVG(bsr)) OVER (PARTITION BY asin ORDER BY MIN(date))) /
+                                      LAG(AVG(bsr)) OVER (PARTITION BY asin ORDER BY MIN(date)) * 100)::numeric, 2)
+                            ELSE NULL
+                        END as bsr_change_pct
+                    FROM core.product_metrics_daily
+                    WHERE date >= :start_date AND date <= :as_of_date
+                    GROUP BY asin
+                    HAVING COUNT(*) >= 2
+                    ON CONFLICT (asin, duration, as_of) DO UPDATE SET
+                        price_avg = EXCLUDED.price_avg,
+                        price_min = EXCLUDED.price_min,
+                        price_max = EXCLUDED.price_max,
+                        bsr_avg = EXCLUDED.bsr_avg,
+                        rating_avg = EXCLUDED.rating_avg,
+                        reviews_delta = EXCLUDED.reviews_delta,
+                        price_change_pct = EXCLUDED.price_change_pct,
+                        bsr_change_pct = EXCLUDED.bsr_change_pct
+                """)
+
+                result = await session.execute(rollup_query, {
+                    'duration': duration,
+                    'as_of_date': as_of_date,
+                    'start_date': start_date
+                })
+                records_created += result.rowcount
+
             await session.commit()
-            
-        logger.info(f"Updated {updated_count} product summaries")
-        return updated_count
-    
-    async def _compute_product_summary(self, session: AsyncSession, product: Product, 
-                                     target_date: date, thirty_days_ago: date) -> Dict[str, Any]:
-        """Compute summary statistics for a single product."""
-        asin = product.asin
-        
-        # Get latest metrics
-        latest_query = select(ProductMetricsDaily).where(
-            ProductMetricsDaily.asin == asin
-        ).order_by(ProductMetricsDaily.date.desc()).limit(1)
-        
-        latest_result = await session.execute(latest_query)
-        latest_metrics = latest_result.scalar_one_or_none()
-        
-        # Get 30-day metrics for aggregates
-        aggregates_query = select(
-            func.avg(ProductMetricsDaily.price).label('avg_price'),
-            func.min(ProductMetricsDaily.price).label('min_price'), 
-            func.max(ProductMetricsDaily.price).label('max_price'),
-            func.avg(ProductMetricsDaily.bsr).label('avg_bsr'),
-            func.count().label('record_count')
-        ).where(
-            ProductMetricsDaily.asin == asin,
-            ProductMetricsDaily.date >= thirty_days_ago,
-            ProductMetricsDaily.date <= target_date
-        )
-        
-        agg_result = await session.execute(aggregates_query)
-        aggregates = agg_result.one()
-        
-        # Calculate percentage changes
-        price_change_30d_pct = None
-        bsr_change_30d_pct = None
-        
-        if latest_metrics and aggregates.avg_price:
-            if latest_metrics.price and aggregates.avg_price:
-                price_change_30d_pct = (
-                    (float(latest_metrics.price) - float(aggregates.avg_price)) / 
-                    float(aggregates.avg_price) * 100
-                )
-        
-        if latest_metrics and aggregates.avg_bsr:
-            if latest_metrics.bsr and aggregates.avg_bsr:
-                bsr_change_30d_pct = (
-                    (latest_metrics.bsr - float(aggregates.avg_bsr)) / 
-                    float(aggregates.avg_bsr) * 100
-                )
-        
-        # Calculate data quality score (0-1)
-        data_quality_score = min(1.0, aggregates.record_count / 30.0) if aggregates.record_count else 0
-        
-        return {
-            'asin': asin,
-            'title': product.title,
-            'brand': product.brand,
-            'category': product.category,
-            'image_url': product.image_url,
-            'latest_price': float(latest_metrics.price) if latest_metrics and latest_metrics.price else None,
-            'latest_bsr': latest_metrics.bsr if latest_metrics else None,
-            'latest_rating': float(latest_metrics.rating) if latest_metrics and latest_metrics.rating else None,
-            'latest_reviews_count': latest_metrics.reviews_count if latest_metrics else None,
-            'latest_buybox_price': float(latest_metrics.buybox_price) if latest_metrics and latest_metrics.buybox_price else None,
-            'latest_metrics_date': latest_metrics.date if latest_metrics else None,
-            'avg_price_30d': float(aggregates.avg_price) if aggregates.avg_price else None,
-            'min_price_30d': float(aggregates.min_price) if aggregates.min_price else None,
-            'max_price_30d': float(aggregates.max_price) if aggregates.max_price else None,
-            'avg_bsr_30d': float(aggregates.avg_bsr) if aggregates.avg_bsr else None,
-            'price_change_30d_pct': price_change_30d_pct,
-            'bsr_change_30d_pct': bsr_change_30d_pct,
-            'first_seen_at': product.first_seen_at,
-            'last_seen_at': product.last_seen_at,
-            'data_quality_score': data_quality_score,
-            'last_updated': datetime.now()
-        }
-    
-    async def _upsert_product_summary(self, session: AsyncSession, summary_data: Dict[str, Any]):
-        """Upsert product summary record."""
-        stmt = pg_insert(ProductSummary).values(**summary_data)
-        stmt = stmt.on_conflict_do_update(
-            index_elements=['asin'],
-            set_={key: stmt.excluded[key] for key in summary_data.keys() if key != 'asin'}
-        )
-        await session.execute(stmt)
-    
-    async def compute_daily_aggregates(self, target_date: date) -> Dict[str, Any]:
-        """Compute daily aggregates across all products."""
-        logger.info(f"Computing daily aggregates for {target_date}")
-        
+
+        logger.info(f"Created/updated {records_created} rollup records for {as_of_date}")
+        return records_created
+
+    async def populate_daily_deltas(self, target_date: Optional[date] = None) -> int:
+        """Populate daily delta metrics comparing day-over-day changes."""
+        if target_date is None:
+            target_date = date.today()
+
+        previous_date = target_date - timedelta(days=1)
+
         async with get_db_session() as session:
-            # Yesterday's date for comparison
-            previous_date = target_date - timedelta(days=1)
-            
-            # Basic counts
-            total_products_query = select(func.count(Product.asin)).select_from(Product)
-            total_products = await session.scalar(total_products_query)
-            
-            # Products with data on target date
-            daily_metrics_query = select(
-                func.count().label('total_with_data'),
-                func.count(ProductMetricsDaily.price).label('with_price'),
-                func.count(ProductMetricsDaily.bsr).label('with_bsr'),
-                func.avg(ProductMetricsDaily.price).label('avg_price'),
-                func.percentile_cont(0.5).within_group(ProductMetricsDaily.price.asc()).label('median_price'),
-                func.stddev(ProductMetricsDaily.price).label('price_std_dev'),
-                func.avg(ProductMetricsDaily.bsr).label('avg_bsr'),
-                func.percentile_cont(0.5).within_group(ProductMetricsDaily.bsr.asc()).label('median_bsr')
-            ).where(ProductMetricsDaily.date == target_date)
-            
-            daily_result = await session.execute(daily_metrics_query)
-            daily_stats = daily_result.one()
-            
-            # New products (first seen today)
-            new_products_query = select(func.count()).where(
-                func.date(Product.first_seen_at) == target_date
-            )
-            new_products = await session.scalar(new_products_query)
-            
-            # Price changes (compare with previous day)
-            price_changes = await self._compute_price_changes(session, target_date, previous_date)
-            
-            # Create aggregate record
-            aggregates_data = {
-                'date': target_date,
-                'total_products': total_products,
-                'products_with_price': daily_stats.with_price or 0,
-                'products_with_bsr': daily_stats.with_bsr or 0,
-                'new_products': new_products or 0,
-                'avg_price': float(daily_stats.avg_price) if daily_stats.avg_price else None,
-                'median_price': float(daily_stats.median_price) if daily_stats.median_price else None,
-                'price_std_dev': float(daily_stats.price_std_dev) if daily_stats.price_std_dev else None,
-                'avg_bsr': float(daily_stats.avg_bsr) if daily_stats.avg_bsr else None,
-                'median_bsr': int(daily_stats.median_bsr) if daily_stats.median_bsr else None,
-                'products_price_increase': price_changes['price_increase'],
-                'products_price_decrease': price_changes['price_decrease'],
-                'products_bsr_improve': price_changes['bsr_improve'],
-                'products_bsr_decline': price_changes['bsr_decline'],
-                'created_at': datetime.now()
-            }
-            
-            # Upsert daily aggregates
-            stmt = pg_insert(DailyAggregates).values(**aggregates_data)
-            stmt = stmt.on_conflict_do_update(
-                index_elements=['date'],
-                set_={key: stmt.excluded[key] for key in aggregates_data.keys() if key != 'date'}
-            )
-            await session.execute(stmt)
+            delta_query = text("""
+                INSERT INTO mart.product_metrics_delta_daily
+                (asin, date, price_delta, price_change_pct, bsr_delta, bsr_change_pct, rating_delta, reviews_delta, buybox_delta)
+                SELECT
+                    curr.asin,
+                    curr.date,
+                    ROUND((curr.price - prev.price)::numeric, 2) as price_delta,
+                    CASE
+                        WHEN prev.price > 0
+                        THEN ROUND(((curr.price - prev.price) / prev.price * 100)::numeric, 2)
+                        ELSE NULL
+                    END as price_change_pct,
+                    curr.bsr - prev.bsr as bsr_delta,
+                    CASE
+                        WHEN prev.bsr > 0
+                        THEN ROUND(((curr.bsr - prev.bsr)::numeric / prev.bsr * 100)::numeric, 2)
+                        ELSE NULL
+                    END as bsr_change_pct,
+                    ROUND((curr.rating - prev.rating)::numeric, 2) as rating_delta,
+                    curr.reviews_count - prev.reviews_count as reviews_delta,
+                    ROUND((curr.buybox_price - prev.buybox_price)::numeric, 2) as buybox_delta
+                FROM core.product_metrics_daily curr
+                LEFT JOIN core.product_metrics_daily prev
+                    ON curr.asin = prev.asin AND prev.date = :previous_date
+                WHERE curr.date = :target_date
+                ON CONFLICT (asin, date) DO UPDATE SET
+                    price_delta = EXCLUDED.price_delta,
+                    price_change_pct = EXCLUDED.price_change_pct,
+                    bsr_delta = EXCLUDED.bsr_delta,
+                    bsr_change_pct = EXCLUDED.bsr_change_pct,
+                    rating_delta = EXCLUDED.rating_delta,
+                    reviews_delta = EXCLUDED.reviews_delta,
+                    buybox_delta = EXCLUDED.buybox_delta
+            """)
+
+            result = await session.execute(delta_query, {
+                'target_date': target_date,
+                'previous_date': previous_date
+            })
             await session.commit()
-            
-        logger.info(f"Daily aggregates computed for {target_date}")
-        return aggregates_data
-    
-    async def _compute_price_changes(self, session: AsyncSession, 
-                                   target_date: date, previous_date: date) -> Dict[str, int]:
-        """Compute price change statistics between two dates."""
-        # Get price comparison data
-        price_comparison_query = text("""
-            SELECT 
-                COUNT(CASE WHEN today.price > yesterday.price THEN 1 END) as price_increase,
-                COUNT(CASE WHEN today.price < yesterday.price THEN 1 END) as price_decrease,
-                COUNT(CASE WHEN today.bsr < yesterday.bsr THEN 1 END) as bsr_improve,
-                COUNT(CASE WHEN today.bsr > yesterday.bsr THEN 1 END) as bsr_decline
-            FROM core.product_metrics_daily today
-            JOIN core.product_metrics_daily yesterday 
-                ON today.asin = yesterday.asin
-            WHERE today.date = :target_date 
-                AND yesterday.date = :previous_date
-                AND today.price IS NOT NULL 
-                AND yesterday.price IS NOT NULL
-        """)
-        
-        result = await session.execute(price_comparison_query, {
-            'target_date': target_date,
-            'previous_date': previous_date
-        })
-        
-        changes = result.one()
-        
-        return {
-            'price_increase': changes.price_increase or 0,
-            'price_decrease': changes.price_decrease or 0,
-            'bsr_improve': changes.bsr_improve or 0,
-            'bsr_decline': changes.bsr_decline or 0
-        }
-    
-    async def get_summary_stats(self) -> Dict[str, Any]:
-        """Get overall mart layer statistics."""
+
+        logger.info(f"Created/updated {result.rowcount} daily delta records for {target_date}")
+        return result.rowcount
+
+    async def populate_competitor_comparisons(self, target_date: Optional[date] = None) -> int:
+        """Populate competitor comparison data based on competitor links."""
+        if target_date is None:
+            target_date = date.today()
+
         async with get_db_session() as session:
-            summary_count = await session.scalar(select(func.count()).select_from(ProductSummary))
-            
-            latest_aggregates_query = select(DailyAggregates).order_by(
-                DailyAggregates.date.desc()
-            ).limit(1)
-            
-            latest_result = await session.execute(latest_aggregates_query)
-            latest_aggregates = latest_result.scalar_one_or_none()
-            
-            return {
-                'product_summaries_count': summary_count,
-                'latest_aggregates_date': latest_aggregates.date if latest_aggregates else None,
-                'last_updated': datetime.now()
-            }
+            comparison_query = text("""
+                INSERT INTO mart.competitor_comparison_daily
+                (asin_main, asin_comp, date, price_diff, bsr_gap, rating_diff, reviews_gap, buybox_diff)
+                SELECT
+                    cl.asin_main,
+                    cl.asin_comp,
+                    :target_date,
+                    ROUND((main_metrics.price - comp_metrics.price)::numeric, 2) as price_diff,
+                    main_metrics.bsr - comp_metrics.bsr as bsr_gap,
+                    ROUND((main_metrics.rating - comp_metrics.rating)::numeric, 2) as rating_diff,
+                    main_metrics.reviews_count - comp_metrics.reviews_count as reviews_gap,
+                    ROUND((main_metrics.buybox_price - comp_metrics.buybox_price)::numeric, 2) as buybox_diff
+                FROM core.competitor_links cl
+                JOIN core.product_metrics_daily main_metrics
+                    ON cl.asin_main = main_metrics.asin AND main_metrics.date = :target_date
+                JOIN core.product_metrics_daily comp_metrics
+                    ON cl.asin_comp = comp_metrics.asin AND comp_metrics.date = :target_date
+                WHERE cl.is_active = true
+                ON CONFLICT (asin_main, asin_comp, date) DO UPDATE SET
+                    price_diff = EXCLUDED.price_diff,
+                    bsr_gap = EXCLUDED.bsr_gap,
+                    rating_diff = EXCLUDED.rating_diff,
+                    reviews_gap = EXCLUDED.reviews_gap,
+                    buybox_diff = EXCLUDED.buybox_diff
+            """)
+
+            result = await session.execute(comparison_query, {
+                'target_date': target_date
+            })
+            await session.commit()
+
+        logger.info(f"Created/updated {result.rowcount} competitor comparison records for {target_date}")
+        return result.rowcount
+
+    async def populate_full_mart_layer(self, target_date: Optional[date] = None) -> Dict[str, int]:
+        """Populate all mart layer tables for a given date."""
+        if target_date is None:
+            target_date = date.today()
+
+        logger.info(f"Starting full mart layer population for {target_date}")
+
+        results = {}
+
+        # 1. Refresh materialized view
+        view_success = await self.refresh_materialized_view()
+        results['materialized_view_refreshed'] = 1 if view_success else 0
+
+        # 2. Populate rollups
+        results['rollup_records'] = await self.populate_metrics_rollups(target_date)
+
+        # 3. Populate daily deltas
+        results['delta_records'] = await self.populate_daily_deltas(target_date)
+
+        # 4. Populate competitor comparisons
+        results['comparison_records'] = await self.populate_competitor_comparisons(target_date)
+
+        logger.info(f"Completed mart layer population: {results}")
+        return results
+
+    async def backfill_mart_data(self, start_date: date, end_date: Optional[date] = None) -> Dict[str, int]:
+        """Backfill mart layer data for a date range."""
+        if end_date is None:
+            end_date = date.today()
+
+        logger.info(f"Starting mart layer backfill from {start_date} to {end_date}")
+
+        total_results = {
+            'materialized_view_refreshed': 0,
+            'rollup_records': 0,
+            'delta_records': 0,
+            'comparison_records': 0,
+            'days_processed': 0
+        }
+
+        current_date = start_date
+        while current_date <= end_date:
+            day_results = await self.populate_full_mart_layer(current_date)
+
+            for key, value in day_results.items():
+                total_results[key] += value
+
+            total_results['days_processed'] += 1
+            current_date += timedelta(days=1)
+
+        logger.info(f"Completed mart layer backfill: {total_results}")
+        return total_results
+
+    async def get_mart_stats(self) -> Dict[str, Any]:
+        """Get statistics about mart layer population."""
+        async with get_db_session() as session:
+            stats = {}
+
+            # Count rollup records by duration
+            rollup_result = await session.execute(
+                text("SELECT duration, COUNT(*) as count FROM mart.product_metrics_rollup GROUP BY duration")
+            )
+            stats['rollup_counts'] = dict(rollup_result.fetchall())
+
+            # Count delta records
+            delta_result = await session.execute(
+                text("SELECT COUNT(*) as count FROM mart.product_metrics_delta_daily")
+            )
+            stats['delta_count'] = delta_result.scalar()
+
+            # Count comparison records
+            comparison_result = await session.execute(
+                text("SELECT COUNT(*) as count FROM mart.competitor_comparison_daily")
+            )
+            stats['comparison_count'] = comparison_result.scalar()
+
+            # Latest data dates
+            latest_rollup = await session.execute(
+                text("SELECT MAX(as_of) as latest_date FROM mart.product_metrics_rollup")
+            )
+            stats['latest_rollup_date'] = latest_rollup.scalar()
+
+            latest_delta = await session.execute(
+                text("SELECT MAX(date) as latest_date FROM mart.product_metrics_delta_daily")
+            )
+            stats['latest_delta_date'] = latest_delta.scalar()
+
+            latest_comparison = await session.execute(
+                text("SELECT MAX(date) as latest_date FROM mart.competitor_comparison_daily")
+            )
+            stats['latest_comparison_date'] = latest_comparison.scalar()
+
+        return stats
 
 
-# Global mart processor instance
-mart_processor = MartProcessor()
+# Global service instance
+mart_service = MartService()

@@ -30,8 +30,10 @@ sys.path.insert(0, str(project_root / "src"))
 from src.main.database import init_db, get_db_session
 from src.main.services.ingest import IngestionService
 from src.main.services.processor import CoreMetricsProcessor
-from src.main.models.staging import RawProductEvent
-from src.main.models.product import Product, ProductMetricsDaily
+from src.main.models.staging import IngestRuns, RawEvents
+from src.main.models.product import Product, ProductMetricsDaily, ProductFeatures
+from src.main.models.competition import CompetitorLink
+from src.main.models.mart import ProductMetricsRollup, ProductMetricsDeltaDaily, CompetitorComparisonDaily
 from sqlalchemy import delete, select, text
 
 # Import enhanced mapper and validator
@@ -56,7 +58,7 @@ class DatabaseRebuilder:
         self.asin_validator = ASINValidator()
 
     async def clear_existing_data(self, dry_run: bool = False) -> Dict[str, Any]:
-        """Clear existing data from core tables."""
+        """Clear existing data from all tables matching Supabase schema."""
         logger.info("Starting database clear operation...")
 
         if dry_run:
@@ -65,7 +67,7 @@ class DatabaseRebuilder:
 
         async with get_db_session() as session:
             # Count records before deletion
-            raw_events_count = await session.execute(select(RawProductEvent))
+            raw_events_count = await session.execute(select(RawEvents))
             raw_events_count = len(raw_events_count.fetchall())
 
             product_metrics_count = await session.execute(select(ProductMetricsDaily))
@@ -74,16 +76,31 @@ class DatabaseRebuilder:
             products_count = await session.execute(select(Product))
             products_count = len(products_count.fetchall())
 
-            # Clear product_features table
-            features_result = await session.execute(text("DELETE FROM core.product_features"))
-            features_deleted = features_result.rowcount
+            # Count features
+            features_result = await session.execute(select(ProductFeatures))
+            features_count = len(features_result.fetchall())
+
+            # Count competitor links
+            comp_links_result = await session.execute(select(CompetitorLink))
+            comp_links_count = len(comp_links_result.fetchall())
+
+            # Clear mart tables first (due to foreign keys)
+            await session.execute(delete(CompetitorComparisonDaily))
+            await session.execute(delete(ProductMetricsDeltaDaily))
+            await session.execute(delete(ProductMetricsRollup))
 
             # Clear staging tables
-            await session.execute(delete(RawProductEvent))
+            await session.execute(delete(RawEvents))
+            await session.execute(delete(IngestRuns))
 
             # Clear core tables
+            await session.execute(delete(ProductFeatures))
+            await session.execute(delete(CompetitorLink))
             await session.execute(delete(ProductMetricsDaily))
             await session.execute(delete(Product))
+
+            # Refresh materialized view to reflect deletions
+            await session.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY mart.mv_product_latest"))
 
             await session.commit()
 
@@ -91,7 +108,8 @@ class DatabaseRebuilder:
             "raw_events_deleted": raw_events_count,
             "product_metrics_deleted": product_metrics_count,
             "products_deleted": products_count,
-            "features_deleted": features_deleted,
+            "features_deleted": features_count,
+            "competitor_links_deleted": comp_links_count,
             "status": "completed"
         }
 
@@ -127,8 +145,9 @@ class DatabaseRebuilder:
                 "valid_products": len(filtered_products)
             }
 
-        # Create job for tracking
+        # Create job for tracking using Supabase schema
         job_metadata = {
+            "job_name": "rebuild_product_data",
             "source": "apify_rebuild",
             "data_file": str(products_file),
             "total_products": len(products_data),
@@ -136,8 +155,8 @@ class DatabaseRebuilder:
             "rebuild_type": "enhanced_parsing"
         }
 
-        job_id = await self.ingest_service.create_job("rebuild_product_data", job_metadata)
-        await self.ingest_service.start_job(job_id)
+        job_id = await self._create_ingest_run("rebuild_product_data", job_metadata)
+        await self._start_ingest_run(job_id)
 
         logger.info(f"Created job {job_id} for product rebuild")
 
@@ -172,8 +191,14 @@ class DatabaseRebuilder:
             logger.info("Processing raw events into core tables with enhanced parsing...")
             core_processed, core_failed = await self.processor.process_product_events(job_id)
 
+            # Setup competitor links from config
+            competitor_links_created = await self._setup_competitor_links()
+
+            # Populate mart layer
+            await self._populate_mart_layer()
+
             # Complete job
-            await self.ingest_service.complete_job(
+            await self._complete_ingest_run(
                 job_id,
                 records_processed=processed,
                 records_failed=failed
@@ -186,18 +211,19 @@ class DatabaseRebuilder:
                 "products_failed": failed,
                 "features_processed": features_processed,
                 "core_processed": core_processed,
-                "core_failed": core_failed
+                "core_failed": core_failed,
+                "competitor_links_created": competitor_links_created
             }
 
             logger.info(f"Product rebuild completed: {result}")
             return result
 
         except Exception as e:
-            await self.ingest_service.complete_job(job_id, error_message=str(e))
+            await self._complete_ingest_run(job_id, error_message=str(e))
             raise
 
     async def _ingest_single_product(self, product_data: Dict[str, Any], job_id: str):
-        """Ingest a single product into raw events table."""
+        """Ingest a single product into Supabase raw events table."""
         asin = product_data.get('asin')
         if not asin:
             raise ValueError("Product missing ASIN")
@@ -205,25 +231,22 @@ class DatabaseRebuilder:
         # Map Apify data to internal schema format using enhanced mapper
         mapped_data = create_mapped_event_data(product_data, "product_update")
 
-        # Keep original data for reference and add mapped data
-        event_data = {
-            **product_data,  # Original Apify data
-            '_mapped': mapped_data,  # Enhanced mapped data
-            '_rebuild_timestamp': datetime.now().isoformat()
+        # Create payload with original data and mapped data
+        payload = {
+            "event_type": "product_update",
+            "original_data": product_data,
+            "mapped_data": mapped_data,
+            "rebuild_timestamp": datetime.now().isoformat()
         }
 
-        # Create raw event ID
-        event_id = f"rebuild_{asin}_{int(datetime.now().timestamp())}"
-
-        # Create raw product event
-        raw_event = RawProductEvent(
-            id=event_id,
-            asin=asin,
-            source="apify_rebuild",
-            event_type="product_update",
-            raw_data=event_data,
+        # Create raw event using Supabase schema
+        raw_event = RawEvents(
             job_id=job_id,
-            ingested_at=datetime.now()
+            source="apify_rebuild",
+            asin=asin,
+            url=product_data.get('url'),
+            payload=payload,
+            fetched_at=datetime.now()
         )
 
         async with get_db_session() as session:
@@ -233,34 +256,29 @@ class DatabaseRebuilder:
         logger.debug(f"Ingested enhanced raw event for ASIN {asin}")
 
     async def _process_product_features(self, product_data: Dict[str, Any]) -> int:
-        """Process product features into product_features table."""
+        """Process product features into Supabase product_features table."""
         features_data = extract_features_for_database(product_data)
 
-        if not features_data:
+        if not features_data or not features_data.get('asin'):
             return 0
 
         async with get_db_session() as session:
-            for feature_record in features_data:
-                # Insert into product_features table
-                insert_query = text("""
-                    INSERT INTO core.product_features (asin, feature_text, order_index, created_at)
-                    VALUES (:asin, :feature_text, :order_index, :created_at)
-                    ON CONFLICT (asin, order_index)
-                    DO UPDATE SET
-                        feature_text = EXCLUDED.feature_text,
-                        updated_at = :created_at
-                """)
+            # Create ProductFeatures record using Supabase schema
+            product_features = ProductFeatures(
+                asin=features_data['asin'],
+                bullets=features_data.get('bullets'),
+                attributes=features_data.get('attributes'),
+                extracted_at=datetime.now()
+            )
 
-                await session.execute(insert_query, {
-                    'asin': feature_record['asin'],
-                    'feature_text': feature_record['feature_text'],
-                    'order_index': feature_record['order_index'],
-                    'created_at': datetime.now()
-                })
-
+            # Use merge to handle duplicates
+            await session.merge(product_features)
             await session.commit()
 
-        return len(features_data)
+        # Count features extracted
+        bullets_count = len(features_data.get('bullets', []))
+        attributes_count = len(features_data.get('attributes', {}))
+        return bullets_count + attributes_count
 
     async def rebuild_all(self, dry_run: bool = False) -> Dict[str, Any]:
         """Complete rebuild: clear existing data and rebuild with enhanced parsing."""
@@ -299,7 +317,7 @@ class DatabaseRebuilder:
         return results
 
     async def validate_rebuild(self) -> Dict[str, Any]:
-        """Validate the rebuilt data quality."""
+        """Validate the rebuilt data quality against Supabase schema."""
         logger.info("Starting rebuild validation...")
 
         async with get_db_session() as session:
@@ -312,8 +330,22 @@ class DatabaseRebuilder:
             metrics_count = len(metrics_result.fetchall())
 
             # Count features
-            features_result = await session.execute(text("SELECT COUNT(*) FROM core.product_features"))
-            features_count = features_result.scalar()
+            features_result = await session.execute(select(ProductFeatures))
+            features_count = len(features_result.fetchall())
+
+            # Count competitor links
+            comp_links_result = await session.execute(select(CompetitorLink))
+            comp_links_count = len(comp_links_result.fetchall())
+
+            # Count mart tables
+            rollup_result = await session.execute(select(ProductMetricsRollup))
+            rollup_count = len(rollup_result.fetchall())
+
+            delta_result = await session.execute(select(ProductMetricsDeltaDaily))
+            delta_count = len(delta_result.fetchall())
+
+            comp_daily_result = await session.execute(select(CompetitorComparisonDaily))
+            comp_daily_count = len(comp_daily_result.fetchall())
 
             # Sample a few products to check data quality
             sample_products = await session.execute(
@@ -333,15 +365,25 @@ class DatabaseRebuilder:
             )
             rating_count = len(rating_count.fetchall())
 
+            # Check materialized view
+            mv_result = await session.execute(text("SELECT COUNT(*) FROM mart.mv_product_latest"))
+            mv_count = mv_result.scalar()
+
         validation_result = {
             "products_count": products_count,
             "metrics_count": metrics_count,
             "features_count": features_count,
+            "competitor_links_count": comp_links_count,
+            "rollup_count": rollup_count,
+            "delta_count": delta_count,
+            "competitor_daily_count": comp_daily_count,
+            "materialized_view_count": mv_count,
             "bsr_parsed_count": bsr_count,
             "rating_parsed_count": rating_count,
             "sample_products": [
                 {
                     "asin": p.asin,
+                    "date": p.date.isoformat(),
                     "price": float(p.price) if p.price else None,
                     "bsr": p.bsr,
                     "rating": float(p.rating) if p.rating else None,
@@ -354,6 +396,161 @@ class DatabaseRebuilder:
 
         logger.info(f"Rebuild validation completed: {validation_result}")
         return validation_result
+
+    async def _create_ingest_run(self, job_name: str, metadata: Dict[str, Any]) -> str:
+        """Create an ingest run record using Supabase schema."""
+        job_id = f"{job_name}_{int(datetime.now().timestamp())}"
+
+        async with get_db_session() as session:
+            ingest_run = IngestRuns(
+                job_id=job_id,
+                source="apify_rebuild",
+                started_at=datetime.now(),
+                status="SUCCESS",
+                meta=metadata
+            )
+            session.add(ingest_run)
+            await session.commit()
+
+        logger.info(f"Created ingest run {job_id}")
+        return job_id
+
+    async def _start_ingest_run(self, job_id: str):
+        """Start an ingest run - already started in create."""
+        pass
+
+    async def _complete_ingest_run(self, job_id: str, records_processed: int = 0, records_failed: int = 0, error_message: str = None):
+        """Complete an ingest run record."""
+        async with get_db_session() as session:
+            # Update the ingest run
+            result = await session.execute(
+                select(IngestRuns).where(IngestRuns.job_id == job_id)
+            )
+            ingest_run = result.scalar_one_or_none()
+
+            if ingest_run:
+                ingest_run.finished_at = datetime.now()
+                ingest_run.status = "FAILED" if error_message else "SUCCESS"
+
+                # Update metadata
+                meta = ingest_run.meta or {}
+                meta.update({
+                    "records_processed": records_processed,
+                    "records_failed": records_failed,
+                    "error_message": error_message,
+                    "completed_at": datetime.now().isoformat()
+                })
+                ingest_run.meta = meta
+
+                await session.commit()
+
+        logger.info(f"Completed ingest run {job_id}")
+
+    async def _setup_competitor_links(self) -> int:
+        """Setup competitor links from config file."""
+        valid_asins = self.asin_validator.get_valid_asins_from_config()
+        main_asins = [asin for asin, role in valid_asins.items() if role == 'main']
+        comp_asins = [asin for asin, role in valid_asins.items() if role == 'comp']
+
+        logger.info(f"Setting up competitor links: {len(main_asins)} main ASINs, {len(comp_asins)} competitor ASINs")
+
+        links_created = 0
+        async with get_db_session() as session:
+            for main_asin in main_asins:
+                for comp_asin in comp_asins:
+                    # Create competitor link
+                    comp_link = CompetitorLink(
+                        asin_main=main_asin,
+                        asin_comp=comp_asin,
+                        created_at=datetime.now()
+                    )
+                    await session.merge(comp_link)  # Use merge to handle duplicates
+                    links_created += 1
+
+            await session.commit()
+
+        logger.info(f"Created {links_created} competitor links")
+        return links_created
+
+    async def _populate_mart_layer(self):
+        """Populate mart layer tables with aggregated data."""
+        logger.info("Populating mart layer tables...")
+
+        async with get_db_session() as session:
+            # Refresh materialized view first
+            await session.execute(text("REFRESH MATERIALIZED VIEW CONCURRENTLY mart.mv_product_latest"))
+
+            # Populate 30-day rollups (simplified for now)
+            rollup_query = text("""
+                INSERT INTO mart.product_metrics_rollup (asin, duration, as_of, price_avg, price_min, price_max, bsr_avg, rating_avg)
+                SELECT
+                    asin,
+                    '30d' as duration,
+                    CURRENT_DATE as as_of,
+                    AVG(price) as price_avg,
+                    MIN(price) as price_min,
+                    MAX(price) as price_max,
+                    AVG(bsr) as bsr_avg,
+                    AVG(rating) as rating_avg
+                FROM core.product_metrics_daily
+                WHERE date >= CURRENT_DATE - INTERVAL '30 days'
+                GROUP BY asin
+                ON CONFLICT (asin, duration, as_of) DO UPDATE SET
+                    price_avg = EXCLUDED.price_avg,
+                    price_min = EXCLUDED.price_min,
+                    price_max = EXCLUDED.price_max,
+                    bsr_avg = EXCLUDED.bsr_avg,
+                    rating_avg = EXCLUDED.rating_avg
+            """)
+            await session.execute(rollup_query)
+
+            # Populate daily deltas (simplified)
+            delta_query = text("""
+                INSERT INTO mart.product_metrics_delta_daily (asin, date, price_delta, bsr_delta, rating_delta, reviews_delta)
+                SELECT
+                    m1.asin,
+                    m1.date,
+                    m1.price - COALESCE(m2.price, m1.price) as price_delta,
+                    m1.bsr - COALESCE(m2.bsr, m1.bsr) as bsr_delta,
+                    m1.rating - COALESCE(m2.rating, m1.rating) as rating_delta,
+                    m1.reviews_count - COALESCE(m2.reviews_count, m1.reviews_count) as reviews_delta
+                FROM core.product_metrics_daily m1
+                LEFT JOIN core.product_metrics_daily m2 ON m1.asin = m2.asin AND m2.date = m1.date - INTERVAL '1 day'
+                ON CONFLICT (asin, date) DO UPDATE SET
+                    price_delta = EXCLUDED.price_delta,
+                    bsr_delta = EXCLUDED.bsr_delta,
+                    rating_delta = EXCLUDED.rating_delta,
+                    reviews_delta = EXCLUDED.reviews_delta
+            """)
+            await session.execute(delta_query)
+
+            # Populate competitor comparisons
+            comp_query = text("""
+                INSERT INTO mart.competitor_comparison_daily (asin_main, asin_comp, date, price_diff, bsr_gap, rating_diff, reviews_gap, buybox_diff)
+                SELECT
+                    cl.asin_main,
+                    cl.asin_comp,
+                    m1.date,
+                    m1.price - m2.price as price_diff,
+                    m1.bsr - m2.bsr as bsr_gap,
+                    m1.rating - m2.rating as rating_diff,
+                    m1.reviews_count - m2.reviews_count as reviews_gap,
+                    m1.buybox_price - m2.buybox_price as buybox_diff
+                FROM core.competitor_links cl
+                JOIN core.product_metrics_daily m1 ON cl.asin_main = m1.asin
+                JOIN core.product_metrics_daily m2 ON cl.asin_comp = m2.asin AND m1.date = m2.date
+                ON CONFLICT (asin_main, asin_comp, date) DO UPDATE SET
+                    price_diff = EXCLUDED.price_diff,
+                    bsr_gap = EXCLUDED.bsr_gap,
+                    rating_diff = EXCLUDED.rating_diff,
+                    reviews_gap = EXCLUDED.reviews_gap,
+                    buybox_diff = EXCLUDED.buybox_diff
+            """)
+            await session.execute(comp_query)
+
+            await session.commit()
+
+        logger.info("Mart layer population completed")
 
 
 async def main():
