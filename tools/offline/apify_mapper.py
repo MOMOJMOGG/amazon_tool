@@ -7,7 +7,7 @@ Handles field name differences and data transformations.
 
 import re
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from decimal import Decimal
 
 logger = logging.getLogger(__name__)
@@ -26,11 +26,12 @@ class ApifyDataMapper:
             'category': ApifyDataMapper._extract_category(apify_data),
             'image_url': ApifyDataMapper._extract_image_url(apify_data),
             'price': ApifyDataMapper._extract_price(apify_data),
+            'bsr': ApifyDataMapper._extract_bsr(apify_data),
             'rating': ApifyDataMapper._extract_rating(apify_data),
             'reviews_count': ApifyDataMapper._extract_reviews_count(apify_data),
             'buybox_price': ApifyDataMapper._extract_buybox_price(apify_data)
         }
-        
+
         # Remove None values to avoid overriding existing data
         return {k: v for k, v in mapped.items() if v is not None}
     
@@ -104,18 +105,29 @@ class ApifyDataMapper:
     
     @staticmethod
     def _extract_rating(apify_data: Dict[str, Any]) -> Optional[float]:
-        """Extract product rating from productRating field."""
+        """Extract product rating from productRating field with improved parsing."""
         product_rating = apify_data.get('productRating', '')
-        
+
         if product_rating:
-            # Parse "4.5 out of 5 stars" -> 4.5
-            match = re.search(r'^(\d+\.?\d*)', str(product_rating))
+            # Parse various formats:
+            # "4.5 out of 5 stars" -> 4.5
+            # "5.0" -> 5.0
+            # "4.5 stars" -> 4.5
+            rating_str = str(product_rating).strip()
+
+            # Try to extract decimal number at the beginning
+            match = re.search(r'^(\d+\.?\d*)', rating_str)
             if match:
                 try:
-                    return float(match.group(1))
+                    rating = float(match.group(1))
+                    # Validate rating is in reasonable range (0-5)
+                    if 0 <= rating <= 5:
+                        return rating
+                    else:
+                        logger.warning(f"Rating {rating} outside valid range (0-5): {product_rating}")
                 except ValueError:
                     logger.warning(f"Could not parse rating: {product_rating}")
-        
+
         return None
     
     @staticmethod
@@ -132,9 +144,61 @@ class ApifyDataMapper:
         return None
     
     @staticmethod
+    def _extract_bsr(apify_data: Dict[str, Any]) -> Optional[int]:
+        """Extract Best Sellers Rank from productDetails."""
+        product_details = apify_data.get('productDetails', [])
+
+        for detail in product_details:
+            if isinstance(detail, dict) and detail.get('name') == 'Best Sellers Rank':
+                value = detail.get('value', '')
+                if value:
+                    # Extract all rank numbers from the BSR string
+                    # Example: "#35,077 in Electronics (See Top 100 in Electronics) #2,607 in Earbud & In-Ear Headphones"
+                    rank_pattern = r'#([\d,]+)\s+in\s+([^\(\)]+?)(?:\s*\([^\)]*\))?'
+                    matches = re.findall(rank_pattern, value)
+
+                    if matches:
+                        # Prioritize the most specific category (usually the last/highest number in specific category)
+                        best_rank = None
+                        best_category = None
+
+                        for rank_str, category in matches:
+                            # Remove commas and convert to int
+                            try:
+                                rank_num = int(rank_str.replace(',', ''))
+                                category_clean = category.strip()
+
+                                # Skip generic categories in favor of specific ones
+                                if category_clean.lower() in ['electronics', 'all departments']:
+                                    if best_rank is None:  # Use as fallback
+                                        best_rank = rank_num
+                                        best_category = category_clean
+                                else:
+                                    # Prefer specific categories
+                                    best_rank = rank_num
+                                    best_category = category_clean
+
+                            except ValueError:
+                                logger.warning(f"Could not parse BSR rank: {rank_str}")
+                                continue
+
+                        if best_rank is not None:
+                            logger.debug(f"Extracted BSR {best_rank} from category '{best_category}'")
+                            return best_rank
+
+        return None
+
+    @staticmethod
     def _extract_buybox_price(apify_data: Dict[str, Any]) -> Optional[float]:
-        """Extract buybox price (could be same as price for most products)."""
-        # For now, use the main price as buybox price
+        """Extract buybox price. Return None if buyBoxUsed is null."""
+        buybox_used = apify_data.get('buyBoxUsed')
+
+        # If buyBoxUsed is null, return null (no buybox)
+        if buybox_used is None:
+            return None
+
+        # If buybox exists, try to extract price from buybox data or fallback to main price
+        # For now, use the main price as buybox price when buybox exists
         # In more complex scenarios, this might be different
         return ApifyDataMapper._extract_price(apify_data)
     
@@ -155,6 +219,27 @@ class ApifyDataMapper:
         return None
 
 
+    @staticmethod
+    def extract_features_for_table(apify_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Extract features from features array for storage in product_features table."""
+        asin = apify_data.get('asin')
+        features = apify_data.get('features', [])
+
+        if not asin or not features:
+            return []
+
+        feature_records = []
+        for index, feature_text in enumerate(features):
+            if feature_text and isinstance(feature_text, str):
+                feature_records.append({
+                    'asin': asin,
+                    'feature_text': feature_text.strip(),
+                    'order_index': index + 1  # 1-based indexing
+                })
+
+        return feature_records
+
+
 def create_mapped_event_data(apify_data: Dict[str, Any], event_type: str = "product_update") -> Dict[str, Any]:
     """Create a mapped event data structure for ingestion."""
     if event_type == "product_update":
@@ -164,3 +249,8 @@ def create_mapped_event_data(apify_data: Dict[str, Any], event_type: str = "prod
     else:
         # Return original data for unknown event types
         return apify_data
+
+
+def extract_features_for_database(apify_data: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Helper function to extract features for database insertion."""
+    return ApifyDataMapper.extract_features_for_table(apify_data)

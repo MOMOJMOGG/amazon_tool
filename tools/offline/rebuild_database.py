@@ -1,0 +1,407 @@
+#!/usr/bin/env python3
+"""
+Database Rebuild Tool
+
+Rebuilds Supabase database with improved Apify data parsing.
+Clears existing data and re-processes with enhanced mapper for accurate demo data.
+
+Usage:
+    python tools/offline/rebuild_database.py --rebuild-all [--dry-run]
+    python tools/offline/rebuild_database.py --clear-only [--dry-run]
+    python tools/offline/rebuild_database.py --rebuild-products [--dry-run]
+    python tools/offline/rebuild_database.py --rebuild-features [--dry-run]
+"""
+
+import asyncio
+import json
+import logging
+import uuid
+from datetime import datetime, date
+from pathlib import Path
+from typing import Dict, Any, List, Optional
+import argparse
+import sys
+
+# Add project root and src to path for imports
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(project_root / "src"))
+
+from src.main.database import init_db, get_db_session
+from src.main.services.ingest import IngestionService
+from src.main.services.processor import CoreMetricsProcessor
+from src.main.models.staging import RawProductEvent
+from src.main.models.product import Product, ProductMetricsDaily
+from sqlalchemy import delete, select, text
+
+# Import enhanced mapper and validator
+from tools.offline.apify_mapper import ApifyDataMapper, create_mapped_event_data, extract_features_for_database
+from tools.utilities.asin_validator import ASINValidator
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
+
+
+class DatabaseRebuilder:
+    """Database rebuild tool with improved data parsing."""
+
+    def __init__(self, data_dir: Path = None):
+        self.data_dir = data_dir or Path("data/apify/2025-09-11")
+        self.ingest_service = IngestionService()
+        self.processor = CoreMetricsProcessor()
+        self.asin_validator = ASINValidator()
+
+    async def clear_existing_data(self, dry_run: bool = False) -> Dict[str, Any]:
+        """Clear existing data from core tables."""
+        logger.info("Starting database clear operation...")
+
+        if dry_run:
+            logger.info("DRY RUN: Would clear existing data but not actually executing")
+            return {"dry_run": True, "operation": "clear"}
+
+        async with get_db_session() as session:
+            # Count records before deletion
+            raw_events_count = await session.execute(select(RawProductEvent))
+            raw_events_count = len(raw_events_count.fetchall())
+
+            product_metrics_count = await session.execute(select(ProductMetricsDaily))
+            product_metrics_count = len(product_metrics_count.fetchall())
+
+            products_count = await session.execute(select(Product))
+            products_count = len(products_count.fetchall())
+
+            # Clear product_features table
+            features_result = await session.execute(text("DELETE FROM core.product_features"))
+            features_deleted = features_result.rowcount
+
+            # Clear staging tables
+            await session.execute(delete(RawProductEvent))
+
+            # Clear core tables
+            await session.execute(delete(ProductMetricsDaily))
+            await session.execute(delete(Product))
+
+            await session.commit()
+
+        result = {
+            "raw_events_deleted": raw_events_count,
+            "product_metrics_deleted": product_metrics_count,
+            "products_deleted": products_count,
+            "features_deleted": features_deleted,
+            "status": "completed"
+        }
+
+        logger.info(f"Database clear completed: {result}")
+        return result
+
+    async def rebuild_products(self, dry_run: bool = False) -> Dict[str, Any]:
+        """Rebuild product data with enhanced parsing."""
+        logger.info("Starting product data rebuild...")
+
+        # Load product details JSON
+        products_file = self.data_dir / "dataset_amazon-product-details.json"
+        if not products_file.exists():
+            raise FileNotFoundError(f"Product data file not found: {products_file}")
+
+        with open(products_file, 'r') as f:
+            products_data = json.load(f)
+
+        # Filter to only valid ASINs
+        valid_asins = self.asin_validator.get_valid_asins_from_config()
+        filtered_products = [
+            product for product in products_data
+            if product.get('asin') in valid_asins
+        ]
+
+        logger.info(f"Found {len(products_data)} total products, {len(filtered_products)} valid ASINs to process")
+
+        if dry_run:
+            logger.info("DRY RUN: Would process products but not write to database")
+            return {
+                "dry_run": True,
+                "total_products": len(products_data),
+                "valid_products": len(filtered_products)
+            }
+
+        # Create job for tracking
+        job_metadata = {
+            "source": "apify_rebuild",
+            "data_file": str(products_file),
+            "total_products": len(products_data),
+            "valid_products": len(filtered_products),
+            "rebuild_type": "enhanced_parsing"
+        }
+
+        job_id = await self.ingest_service.create_job("rebuild_product_data", job_metadata)
+        await self.ingest_service.start_job(job_id)
+
+        logger.info(f"Created job {job_id} for product rebuild")
+
+        try:
+            # Process each valid product
+            processed = 0
+            failed = 0
+            features_processed = 0
+
+            for product_data in filtered_products:
+                try:
+                    asin = product_data.get('asin')
+                    if not asin:
+                        raise ValueError("Product missing ASIN")
+
+                    # Ingest raw event with original data
+                    await self._ingest_single_product(product_data, job_id)
+                    processed += 1
+
+                    # Process features separately
+                    features_count = await self._process_product_features(product_data)
+                    features_processed += features_count
+
+                    logger.debug(f"Processed product {asin} with {features_count} features")
+
+                except Exception as e:
+                    asin = product_data.get('asin', 'unknown')
+                    logger.error(f"Failed to process product {asin}: {e}")
+                    failed += 1
+
+            # Process raw events into core tables with enhanced mapping
+            logger.info("Processing raw events into core tables with enhanced parsing...")
+            core_processed, core_failed = await self.processor.process_product_events(job_id)
+
+            # Complete job
+            await self.ingest_service.complete_job(
+                job_id,
+                records_processed=processed,
+                records_failed=failed
+            )
+
+            result = {
+                "job_id": job_id,
+                "total_products_in_file": len(products_data),
+                "valid_products_processed": processed,
+                "products_failed": failed,
+                "features_processed": features_processed,
+                "core_processed": core_processed,
+                "core_failed": core_failed
+            }
+
+            logger.info(f"Product rebuild completed: {result}")
+            return result
+
+        except Exception as e:
+            await self.ingest_service.complete_job(job_id, error_message=str(e))
+            raise
+
+    async def _ingest_single_product(self, product_data: Dict[str, Any], job_id: str):
+        """Ingest a single product into raw events table."""
+        asin = product_data.get('asin')
+        if not asin:
+            raise ValueError("Product missing ASIN")
+
+        # Map Apify data to internal schema format using enhanced mapper
+        mapped_data = create_mapped_event_data(product_data, "product_update")
+
+        # Keep original data for reference and add mapped data
+        event_data = {
+            **product_data,  # Original Apify data
+            '_mapped': mapped_data,  # Enhanced mapped data
+            '_rebuild_timestamp': datetime.now().isoformat()
+        }
+
+        # Create raw event ID
+        event_id = f"rebuild_{asin}_{int(datetime.now().timestamp())}"
+
+        # Create raw product event
+        raw_event = RawProductEvent(
+            id=event_id,
+            asin=asin,
+            source="apify_rebuild",
+            event_type="product_update",
+            raw_data=event_data,
+            job_id=job_id,
+            ingested_at=datetime.now()
+        )
+
+        async with get_db_session() as session:
+            session.add(raw_event)
+            await session.commit()
+
+        logger.debug(f"Ingested enhanced raw event for ASIN {asin}")
+
+    async def _process_product_features(self, product_data: Dict[str, Any]) -> int:
+        """Process product features into product_features table."""
+        features_data = extract_features_for_database(product_data)
+
+        if not features_data:
+            return 0
+
+        async with get_db_session() as session:
+            for feature_record in features_data:
+                # Insert into product_features table
+                insert_query = text("""
+                    INSERT INTO core.product_features (asin, feature_text, order_index, created_at)
+                    VALUES (:asin, :feature_text, :order_index, :created_at)
+                    ON CONFLICT (asin, order_index)
+                    DO UPDATE SET
+                        feature_text = EXCLUDED.feature_text,
+                        updated_at = :created_at
+                """)
+
+                await session.execute(insert_query, {
+                    'asin': feature_record['asin'],
+                    'feature_text': feature_record['feature_text'],
+                    'order_index': feature_record['order_index'],
+                    'created_at': datetime.now()
+                })
+
+            await session.commit()
+
+        return len(features_data)
+
+    async def rebuild_all(self, dry_run: bool = False) -> Dict[str, Any]:
+        """Complete rebuild: clear existing data and rebuild with enhanced parsing."""
+        logger.info("Starting complete database rebuild...")
+
+        results = {}
+
+        # Step 1: Clear existing data
+        logger.info("Step 1: Clearing existing data...")
+        clear_result = await self.clear_existing_data(dry_run)
+        results['clear_operation'] = clear_result
+
+        if dry_run:
+            logger.info("DRY RUN: Would rebuild products but not executing")
+            results['rebuild_operation'] = {"dry_run": True}
+            return results
+
+        # Step 2: Rebuild products with enhanced parsing
+        logger.info("Step 2: Rebuilding products with enhanced parsing...")
+        rebuild_result = await self.rebuild_products(dry_run)
+        results['rebuild_operation'] = rebuild_result
+
+        # Summary
+        total_valid_products = rebuild_result.get('valid_products_processed', 0)
+        total_features = rebuild_result.get('features_processed', 0)
+        total_core_processed = rebuild_result.get('core_processed', 0)
+
+        results['summary'] = {
+            "total_valid_products_processed": total_valid_products,
+            "total_features_processed": total_features,
+            "total_core_records_processed": total_core_processed,
+            "status": "completed"
+        }
+
+        logger.info(f"Complete database rebuild finished: {results['summary']}")
+        return results
+
+    async def validate_rebuild(self) -> Dict[str, Any]:
+        """Validate the rebuilt data quality."""
+        logger.info("Starting rebuild validation...")
+
+        async with get_db_session() as session:
+            # Count products
+            products_result = await session.execute(select(Product))
+            products_count = len(products_result.fetchall())
+
+            # Count metrics
+            metrics_result = await session.execute(select(ProductMetricsDaily))
+            metrics_count = len(metrics_result.fetchall())
+
+            # Count features
+            features_result = await session.execute(text("SELECT COUNT(*) FROM core.product_features"))
+            features_count = features_result.scalar()
+
+            # Sample a few products to check data quality
+            sample_products = await session.execute(
+                select(ProductMetricsDaily).limit(5)
+            )
+            sample_products = sample_products.fetchall()
+
+            # Check for proper BSR parsing
+            bsr_count = await session.execute(
+                select(ProductMetricsDaily).where(ProductMetricsDaily.bsr.is_not(None))
+            )
+            bsr_count = len(bsr_count.fetchall())
+
+            # Check for proper rating parsing
+            rating_count = await session.execute(
+                select(ProductMetricsDaily).where(ProductMetricsDaily.rating.is_not(None))
+            )
+            rating_count = len(rating_count.fetchall())
+
+        validation_result = {
+            "products_count": products_count,
+            "metrics_count": metrics_count,
+            "features_count": features_count,
+            "bsr_parsed_count": bsr_count,
+            "rating_parsed_count": rating_count,
+            "sample_products": [
+                {
+                    "asin": p.asin,
+                    "price": float(p.price) if p.price else None,
+                    "bsr": p.bsr,
+                    "rating": float(p.rating) if p.rating else None,
+                    "reviews_count": p.reviews_count,
+                    "buybox_price": float(p.buybox_price) if p.buybox_price else None
+                }
+                for p in sample_products
+            ]
+        }
+
+        logger.info(f"Rebuild validation completed: {validation_result}")
+        return validation_result
+
+
+async def main():
+    """Main CLI entry point."""
+    parser = argparse.ArgumentParser(description="Database Rebuild Tool with Enhanced Parsing")
+    parser.add_argument("--rebuild-all", action="store_true", help="Clear and rebuild all data")
+    parser.add_argument("--clear-only", action="store_true", help="Clear existing data only")
+    parser.add_argument("--rebuild-products", action="store_true", help="Rebuild products only (no clear)")
+    parser.add_argument("--validate", action="store_true", help="Validate rebuilt data")
+    parser.add_argument("--dry-run", action="store_true", help="Dry run mode (no database writes)")
+    parser.add_argument("--data-dir", type=str, help="Data directory path")
+
+    args = parser.parse_args()
+
+    if not any([args.rebuild_all, args.clear_only, args.rebuild_products, args.validate]):
+        parser.print_help()
+        return
+
+    try:
+        # Initialize database
+        await init_db()
+        logger.info("Database initialized")
+
+        # Create rebuilder
+        data_dir = Path(args.data_dir) if args.data_dir else None
+        rebuilder = DatabaseRebuilder(data_dir)
+
+        # Execute requested operations
+        if args.clear_only:
+            result = await rebuilder.clear_existing_data(dry_run=args.dry_run)
+            print(f"Clear operation: {json.dumps(result, indent=2)}")
+
+        if args.rebuild_products:
+            result = await rebuilder.rebuild_products(dry_run=args.dry_run)
+            print(f"Rebuild products: {json.dumps(result, indent=2)}")
+
+        if args.rebuild_all:
+            result = await rebuilder.rebuild_all(dry_run=args.dry_run)
+            print(f"Complete rebuild: {json.dumps(result, indent=2, default=str)}")
+
+        if args.validate:
+            result = await rebuilder.validate_rebuild()
+            print(f"Validation results: {json.dumps(result, indent=2, default=str)}")
+
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

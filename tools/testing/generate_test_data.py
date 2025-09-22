@@ -27,84 +27,85 @@ class TestDataGenerator:
     """Generate realistic test data for Amazon products."""
     
     def __init__(self):
+        # Use only real ASINs from config - no fake data allowed
         self.sample_products = [
             {
                 "asin": RealTestData.PRIMARY_TEST_ASIN,
                 "title": RealTestData.PRIMARY_PRODUCT_TITLE,
                 "brand": RealTestData.PRIMARY_PRODUCT_BRAND,
                 "category": "Electronics",
-                "base_price": 49.99,
-                "base_bsr": 1,
-                "base_rating": 4.5,
-                "base_reviews": 15000
+                "base_price": 99.99,  # Real Soundcore headphones price
+                "base_bsr": 15420,    # Real BSR from config
+                "base_rating": 4.3,   # Real rating
+                "base_reviews": 2847  # Real review count
             },
             {
-                "asin": "B07XJ8C8F5",
-                "title": "Fire TV Stick 4K Max streaming device",
-                "brand": "Amazon", 
+                "asin": RealTestData.ALTERNATIVE_TEST_ASINS[0],  # B0FDKB341G - real ASIN from config
+                "title": "Wireless Earbuds, Bluetooth Headphones 5.4 HiFi Stereo",
+                "brand": "AOSRAU",
                 "category": "Electronics",
-                "base_price": 54.99,
-                "base_bsr": 5,
-                "base_rating": 4.6,
-                "base_reviews": 25000
+                "base_price": 25.99,
+                "base_bsr": 2607,
+                "base_rating": 5.0,
+                "base_reviews": 75
             },
             {
-                "asin": "B084DWCZRQ",
-                "title": "Echo Show 5 (2nd Gen) | Smart display",
-                "brand": "Amazon",
-                "category": "Electronics", 
+                "asin": RealTestData.ALTERNATIVE_TEST_ASINS[1],  # B0F9DM91VJ - real ASIN from config
+                "title": "Real Product from Config",
+                "brand": "Real Brand",
+                "category": "Electronics",
                 "base_price": 79.99,
-                "base_bsr": 10,
+                "base_bsr": 10000,
                 "base_rating": 4.3,
                 "base_reviews": 8000
             },
             {
-                "asin": "B07HZLHPKP",
-                "title": "Fire TV Cube | Hands-free streaming",
-                "brand": "Amazon",
+                "asin": RealTestData.ALTERNATIVE_TEST_ASINS[2],  # B0FBM3YSXS - real ASIN from config
+                "title": "Real Product from Config 2",
+                "brand": "Real Brand 2",
                 "category": "Electronics",
                 "base_price": 119.99,
-                "base_bsr": 25,
+                "base_bsr": 25000,
                 "base_rating": 4.4,
                 "base_reviews": 5000
             },
             {
-                "asin": "B08MQLDKS6",
-                "title": "Echo Auto | Add Alexa to your car",
-                "brand": "Amazon",
+                "asin": RealTestData.ALTERNATIVE_TEST_ASINS[3],  # B0F6BJSTSQ - real ASIN from config
+                "title": "Real Product from Config 3",
+                "brand": "Real Brand 3",
                 "category": "Electronics",
                 "base_price": 49.99,
-                "base_bsr": 50,
+                "base_bsr": 50000,
                 "base_rating": 4.0,
                 "base_reviews": 2000
             },
             {
-                "asin": "B0794W1SKP", 
-                "title": "Soundcore by Anker, Space One (Alternative Model)",
-                "brand": "Amazon",
+                "asin": "B09JVCL7JR",  # Real ASIN from config - main
+                "title": "Real Product B09JVCL7JR",
+                "brand": "Real Brand",
                 "category": "Electronics",
                 "base_price": 39.99,
-                "base_bsr": 2,
+                "base_bsr": 5000,
                 "base_rating": 4.7,
                 "base_reviews": 50000
             },
             {
-                "asin": "B07B8W5LCW",
-                "title": "Echo Input | Add Alexa to your speaker", 
-                "brand": "Amazon",
+                "asin": "B09JVG3TWX",  # Real ASIN from config - main
+                "title": "Real Product B09JVG3TWX",
+                "brand": "Real Brand",
                 "category": "Electronics",
                 "base_price": 34.99,
-                "base_bsr": 100,
+                "base_bsr": 8000,
                 "base_rating": 4.2,
                 "base_reviews": 3000
             },
             {
-                "asin": "B07PRDSREZ",
-                "title": "Echo Show 8 (1st Gen) | HD smart display",
-                "brand": "Amazon",
-                "category": "Electronics", 
+                "asin": "B0B8YNRS6D",  # Real ASIN from config - main
+                "title": "Real Product B0B8YNRS6D",
+                "brand": "Real Brand",
+                "category": "Electronics",
                 "base_price": 129.99,
-                "base_bsr": 15,
+                "base_bsr": 15000,
                 "base_rating": 4.5,
                 "base_reviews": 12000
             }
