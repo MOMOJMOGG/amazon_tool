@@ -14,6 +14,11 @@ Prerequisites:
     - DATABASE_URL set in environment or .env file
     - Virtual environment activated with dependencies installed
 """
+import os
+import sys
+
+# Add root to path to import test data configuration
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 import asyncio
 from src.main.database import init_db

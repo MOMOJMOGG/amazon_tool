@@ -22,7 +22,7 @@ GRAPHQL_URL = f"{API_BASE_URL}/graphql"
 # Real test data from your system
 DEMO_ASINS = {
     "primary": "B0C6KKQ7ND",  # Soundcore headphones
-    "competitors": ["B0FDKB341G", "B0DNBQ6HPR", "B0D9GYS7BX"]
+    "competitors": ["B0FDKB341G", "B0FHGPF59Q", "B0FM2FRF4X"]
 }
 
 class DemoAPIClient:
@@ -648,7 +648,7 @@ def create_demo_app():
                     batch_asins = gr.Textbox(
                         label="Multiple ASINs (comma-separated)",
                         value=f"{DEMO_ASINS['primary']},{','.join(DEMO_ASINS['competitors'][:2])}",
-                        placeholder="B0C6KKQ7ND,B0FDKB341G,B0DNBQ6HPR"
+                        placeholder="B0C6KKQ7ND,B0FDKB341G,B0FHGPF59Q"
                     )
                     batch_btn = gr.Button("Batch Request", variant="primary")
                 
@@ -782,55 +782,55 @@ def create_demo_app():
                         def load_sample_query(query_name):
                             queries = {
                                 "Single Product Query": f"""
-query GetProduct {{
-  product(asin: "{DEMO_ASINS['primary']}") {{
-    asin
-    title
-    brand
-    category
-    latest {{
-      date
-      price
-      bsr
-      rating
-      reviewsCount
-    }}
-  }}
-}}""",
+                                    query GetProduct {{
+                                    product(asin: "{DEMO_ASINS['primary']}") {{
+                                        asin
+                                        title
+                                        brand
+                                        category
+                                        latest {{
+                                        date
+                                        price
+                                        bsr
+                                        rating
+                                        reviewsCount
+                                        }}
+                                    }}
+                                    }}""",
                                 "Multiple Products Query": f"""
-query GetMultipleProducts {{
-  products(asins: ["{DEMO_ASINS['primary']}", "{DEMO_ASINS['competitors'][0]}"]) {{
-    asin
-    title
-    latest {{
-      price
-      bsr
-      rating
-    }}
-  }}
-}}""",
+                                    query GetMultipleProducts {{
+                                    products(asins: ["{DEMO_ASINS['primary']}", "{DEMO_ASINS['competitors'][0]}"]) {{
+                                        asin
+                                        title
+                                        latest {{
+                                        price
+                                        bsr
+                                        rating
+                                        }}
+                                    }}
+                                    }}""",
                                 "Competition Query": f"""
-query GetCompetition {{
-  competition(asinMain: "{DEMO_ASINS['primary']}", peers: ["{DEMO_ASINS['competitors'][0]}"]) {{
-    asinMain
-    range
-    peers {{
-      asin
-      priceDiff
-      bsrGap
-      ratingDiff
-    }}
-  }}
-}}""",
+                                    query GetCompetition {{
+                                    competition(asinMain: "{DEMO_ASINS['primary']}", peers: ["{DEMO_ASINS['competitors'][0]}"]) {{
+                                        asinMain
+                                        range
+                                        peers {{
+                                        asin
+                                        priceDiff
+                                        bsrGap
+                                        ratingDiff
+                                        }}
+                                    }}
+                                    }}""",
                                 "Latest Report Query": f"""
-query GetLatestReport {{
-  latestReport(asinMain: "{DEMO_ASINS['primary']}") {{
-    asinMain
-    version
-    summary
-    generatedAt
-  }}
-}}"""
+                                    query GetLatestReport {{
+                                    latestReport(asinMain: "{DEMO_ASINS['primary']}") {{
+                                        asinMain
+                                        version
+                                        summary
+                                        generatedAt
+                                    }}
+                                    }}"""
                             }
                             return queries.get(query_name, "")
                         
@@ -841,21 +841,21 @@ query GetLatestReport {{
                             label="GraphQL Query",
                             lines=10,
                             value=f"""
-query GetProduct {{
-  product(asin: "{DEMO_ASINS['primary']}") {{
-    asin
-    title
-    brand
-    category
-    latest {{
-      date
-      price
-      bsr
-      rating
-      reviewsCount
-    }}
-  }}
-}}""",
+                                query GetProduct {{
+                                product(asin: "{DEMO_ASINS['primary']}") {{
+                                    asin
+                                    title
+                                    brand
+                                    category
+                                    latest {{
+                                    date
+                                    price
+                                    bsr
+                                    rating
+                                    reviewsCount
+                                    }}
+                                }}
+                                }}""",
                             placeholder="Enter your GraphQL query here..."
                         )
                         

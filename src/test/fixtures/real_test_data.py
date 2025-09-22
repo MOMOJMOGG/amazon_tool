@@ -24,8 +24,8 @@ class RealTestData:
     # Alternative real ASINs for testing (discovered from database)
     ALTERNATIVE_TEST_ASINS = [
         "B0FDKB341G",  # Another real ASIN found in tests
-        "B0DNBQ6HPR",  # Backup real ASIN  
-        "B0D9GYS7BX",  # Additional real ASIN
+        "B0F9DM91VJ",  # Backup real ASIN  
+        "B0FBM3YSXS",  # Additional real ASIN
         "B0F6BJSTSQ",  # Fourth alternative ASIN for batch tests
     ]
     
@@ -81,7 +81,7 @@ class RealTestData:
             "rating": 4.1
         },
         {
-            "asin": "B0DNBQ6HPR", 
+            "asin": "B0FM2FRF4X", 
             "title": "Competitor Headphones 2",
             "price": 119.99,
             "bsr": 12800,
@@ -103,7 +103,7 @@ class RealTestData:
                 "buybox_diff": 18.00
             },
             {
-                "asin": "B0DNBQ6HPR",
+                "asin": "B0FM2FRF4X",
                 "price_diff": -20.00,
                 "bsr_gap": 2620,
                 "rating_diff": -0.2,

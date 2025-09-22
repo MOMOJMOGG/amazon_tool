@@ -13,6 +13,12 @@ Output:
     - Execution timing information
 """
 
+import os
+import sys
+
+# Add root to path to import test data configuration
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
+
 import asyncio
 from src.main.database import init_db
 
