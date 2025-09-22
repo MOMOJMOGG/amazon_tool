@@ -2,25 +2,24 @@
 
 from datetime import datetime, date
 from typing import Optional, List
-from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, String, DateTime
 from pydantic import BaseModel, Field
 
 from src.main.database import Base
 
 
 class CompetitorLink(Base):
-    """Competitor relationship SQLAlchemy model matching Supabase schema."""
+    """Competitor relationship SQLAlchemy model matching exact Supabase schema."""
 
     __tablename__ = "competitor_links"
     __table_args__ = {"schema": "core"}
 
-    asin_main = Column(String, ForeignKey('core.products.asin', ondelete='CASCADE'), primary_key=True)
-    asin_comp = Column(String, ForeignKey('core.products.asin', ondelete='CASCADE'), primary_key=True)
-    is_active = Column(Boolean, nullable=False, default=True)
+    asin_main = Column(String, primary_key=True)
+    asin_comp = Column(String, primary_key=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     def __repr__(self):
-        return f"<CompetitorLink(main='{self.asin_main}', comp='{self.asin_comp}', active={self.is_active})>"
+        return f"<CompetitorLink(main='{self.asin_main}', comp='{self.asin_comp}')>"
 
 
 # CompetitorComparisonDaily and CompetitionReports models moved to src.main.models.mart

@@ -173,7 +173,6 @@ class MartService:
                     ON cl.asin_main = main_metrics.asin AND main_metrics.date = :target_date
                 JOIN core.product_metrics_daily comp_metrics
                     ON cl.asin_comp = comp_metrics.asin AND comp_metrics.date = :target_date
-                WHERE cl.is_active = true
                 ON CONFLICT (asin_main, asin_comp, date) DO UPDATE SET
                     price_diff = EXCLUDED.price_diff,
                     bsr_gap = EXCLUDED.bsr_gap,
