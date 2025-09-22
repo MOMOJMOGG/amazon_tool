@@ -2,7 +2,7 @@
 
 import uuid
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Union
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -44,7 +44,7 @@ class IngestionService:
             return result.rowcount > 0
     
     async def complete_job(self, job_id: str, records_processed: int = 0,
-                          records_failed: int = 0, error_message: Optional[str] = None, cost: Optional[str] = None) -> bool:
+                          records_failed: int = 0, error_message: Optional[str] = None, cost: Optional[Union[str, float]] = None) -> bool:
         """Mark job as completed or failed."""
         status = 'FAILED' if error_message else 'SUCCESS' if records_failed == 0 else 'PARTIAL'
 
@@ -69,7 +69,7 @@ class IngestionService:
                     .values(
                         status=status,
                         finished_at=datetime.utcnow(),
-                        cost=cost or '0',
+                        cost=float(cost) if cost else 0.0,
                         meta=meta
                     )
                 )

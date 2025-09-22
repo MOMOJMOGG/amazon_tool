@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import Optional, Dict, Any
-from sqlalchemy import Column, String, DateTime, Text, Integer, ForeignKey
+from sqlalchemy import Column, String, DateTime, Text, Integer, ForeignKey, Numeric
 from sqlalchemy.dialects.postgresql import JSONB
 from pydantic import BaseModel, Field
 import enum
@@ -31,7 +31,7 @@ class IngestRuns(Base):
     source_run_id = Column(String, nullable=True)
     started_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     finished_at = Column(DateTime, nullable=True)
-    cost = Column(String, nullable=True, default='0')  # Numeric as string for compatibility
+    cost = Column(Numeric(10, 2), nullable=True, default=0)  # Numeric type to match Supabase
     status = Column(String, nullable=False, default='SUCCESS')  # SUCCESS, PARTIAL, FAILED
     meta = Column(JSONB, nullable=True)
 
