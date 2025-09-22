@@ -22,7 +22,7 @@
 - **mart**（新增）：**預先運算**的彙總/對比/視圖，支撐讀多寫少的查詢；以 **物化檢視或實體化表** 實作。
 
 ### 1.1 ER（簡化）
-```mermaid
+```
 erDiagram
   PRODUCTS ||--o{ PRODUCT_METRICS_DAILY : has
   PRODUCTS ||--o{ COMPETITOR_LINKS : relates
