@@ -9,7 +9,8 @@ import logging
 
 from src.main.database import get_db_session
 from src.main.models.product import ProductMetricsDaily
-from src.main.models.competition import CompetitorLink, CompetitorComparisonDaily
+from src.main.models.competition import CompetitorLink
+from src.main.models.mart import CompetitorComparisonDaily
 from src.main.services.cache import cache
 
 logger = logging.getLogger(__name__)

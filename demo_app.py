@@ -21,8 +21,8 @@ GRAPHQL_URL = f"{API_BASE_URL}/graphql"
 
 # Real test data from your system
 DEMO_ASINS = {
-    "primary": "B0C6KKQ7ND",  # Soundcore headphones
-    "competitors": ["B0FDKB341G", "B0FHGPF59Q", "B0FM2FRF4X"]
+    "primary": "B09JVCL7JR",  # Soundcore headphones
+    "competitors": ["B0C6KKQ7ND", "B0CG2Z78TL", "B0CHYJT52D"]
 }
 
 class DemoAPIClient:
