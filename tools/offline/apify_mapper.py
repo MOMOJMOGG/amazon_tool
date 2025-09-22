@@ -29,11 +29,13 @@ class ApifyDataMapper:
             'bsr': ApifyDataMapper._extract_bsr(apify_data),
             'rating': ApifyDataMapper._extract_rating(apify_data),
             'reviews_count': ApifyDataMapper._extract_reviews_count(apify_data),
-            'buybox_price': ApifyDataMapper._extract_buybox_price(apify_data)
+            'buybox_price': ApifyDataMapper._extract_buybox_price(apify_data),
+            'features': apify_data.get('features'),  # Raw features list
         }
-
-        # Remove None values to avoid overriding existing data
-        return {k: v for k, v in mapped.items() if v is not None}
+        
+        # # Remove None values to avoid overriding existing data
+        # return {k: v for k, v in mapped.items() if v is not None}
+        return mapped
     
     @staticmethod
     def map_review_data(apify_review: Dict[str, Any]) -> Dict[str, Any]:
@@ -147,7 +149,8 @@ class ApifyDataMapper:
     def _extract_bsr(apify_data: Dict[str, Any]) -> Optional[int]:
         """Extract Best Sellers Rank from productDetails."""
         product_details = apify_data.get('productDetails', [])
-
+        product_details = [] if type(product_details) == type(None) else product_details
+        
         for detail in product_details:
             if isinstance(detail, dict) and detail.get('name') == 'Best Sellers Rank':
                 value = detail.get('value', '')
@@ -185,7 +188,7 @@ class ApifyDataMapper:
                         if best_rank is not None:
                             logger.debug(f"Extracted BSR {best_rank} from category '{best_category}'")
                             return best_rank
-
+        print('No BSR found')
         return None
 
     @staticmethod

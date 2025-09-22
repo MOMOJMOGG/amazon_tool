@@ -20,8 +20,8 @@ class Product(Base):
     brand = Column(String, nullable=True)
     category = Column(String, nullable=True)
     image_url = Column(Text, nullable=True)
-    first_seen_at = Column(DateTime, default=datetime.utcnow)
-    last_seen_at = Column(DateTime, nullable=True)
+    first_seen_at = Column(DateTime(timezone=True), default=Text("now()"))
+    last_seen_at = Column(DateTime(timezone=True), nullable=True)
     source_meta = Column(JSONB, nullable=True)
     
     def __repr__(self):
@@ -42,7 +42,7 @@ class ProductMetricsDaily(Base):
     reviews_count = Column(Integer, nullable=True)
     buybox_price = Column(Numeric(10, 2), nullable=True)
     job_id = Column(String, ForeignKey('core.ingest_runs.job_id', ondelete='SET NULL'), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=Text("now()"))
     
     def __repr__(self):
         return f"<ProductMetricsDaily(asin='{self.asin}', date='{self.date}')>"
@@ -57,7 +57,7 @@ class ProductFeatures(Base):
     asin = Column(String, ForeignKey('core.products.asin', ondelete='CASCADE'), primary_key=True)
     bullets = Column(JSONB, nullable=True)  # Feature bullet points as JSONB
     attributes = Column(JSONB, nullable=True)  # Product attributes as JSONB
-    extracted_at = Column(DateTime, default=datetime.utcnow)
+    extracted_at = Column(DateTime(timezone=True), default=Text("now()"))
 
     def __repr__(self):
         return f"<ProductFeatures(asin='{self.asin}')>"

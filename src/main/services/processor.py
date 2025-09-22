@@ -58,15 +58,16 @@ class CoreMetricsProcessor:
     async def _process_single_event(self, session: AsyncSession, event: RawEvents, job_id: str):
         """Process a single raw event into core tables."""
         payload = event.payload
-
+        
         # For Apify sources, map the data using the ApifyDataMapper
         if event.source == 'apify':
             processing_data = ApifyDataMapper.map_product_data(payload)
             features_data = ApifyDataMapper.extract_features_for_supabase(payload)
         else:
             # Use payload directly for other sources
-            processing_data = payload
-            features_data = None
+            processing_data = payload.get('mapped_data', {}) if payload else {}
+            # features_data = payload.get('mapped_data', {}).get('features') if payload else {}
+            features_data = {}
 
         # Validate required fields
         if not processing_data.get('asin'):
@@ -79,6 +80,7 @@ class CoreMetricsProcessor:
             raise ProcessingError(f"Missing title for event {event.id}")
 
         # Upsert product record
+        print(f"Upserting product {asin} - {title}")
         await self._upsert_product(session, event, processing_data)
 
         # Create/update product features if available
@@ -86,6 +88,7 @@ class CoreMetricsProcessor:
             await self._upsert_product_features(session, features_data)
 
         # Create daily metrics record if we have metrics data
+        print(f"Creating daily metrics for {asin}")
         if any(key in processing_data for key in ['price', 'bsr', 'rating', 'reviews_count', 'buybox_price']):
             await self._create_daily_metrics(session, event, processing_data, job_id)
     

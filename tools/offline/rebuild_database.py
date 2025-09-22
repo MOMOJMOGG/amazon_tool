@@ -16,7 +16,7 @@ import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 import argparse
@@ -176,7 +176,7 @@ class DatabaseRebuilder:
                     await self._ingest_single_product(product_data, job_id)
                     processed += 1
 
-                    logger.debug(f"Ingested product {asin} into raw events")
+                    logger.info(f"Ingested product {asin} into raw events")
 
                 except Exception as e:
                     asin = product_data.get('asin', 'unknown')
@@ -186,12 +186,17 @@ class DatabaseRebuilder:
             # Process raw events into core tables with enhanced mapping
             logger.info("Processing raw events into core tables with enhanced parsing...")
             core_processed, core_failed = await self.processor.process_product_events(job_id)
+            logger.info("Processing raw events into core tables with enhanced parsing -- Done")
 
             # Setup competitor links from config
+            logger.info("Setupping competitor links from config...")
             competitor_links_created = await self._setup_competitor_links()
+            logger.info("Setupping competitor links from config -- Done")
 
             # Populate mart layer
+            logger.info("Populating mart layer tables...")
             await self._populate_mart_layer()
+            logger.info("Populating mart layer tables-- Done")
 
             # Complete job
             await self._complete_ingest_run(
@@ -232,7 +237,7 @@ class DatabaseRebuilder:
             "event_type": "product_update",
             "original_data": product_data,
             "mapped_data": mapped_data,
-            "rebuild_timestamp": datetime.now().isoformat()
+            "rebuild_timestamp": datetime.utcnow().isoformat()
         }
 
         # Create raw event using Supabase schema
@@ -242,7 +247,7 @@ class DatabaseRebuilder:
             asin=asin,
             url=product_data.get('url'),
             payload=payload,
-            fetched_at=datetime.now()
+            fetched_at=datetime.utcnow()
         )
 
         async with get_db_session() as session:
@@ -373,13 +378,13 @@ class DatabaseRebuilder:
 
     async def _create_ingest_run(self, job_name: str, metadata: Dict[str, Any]) -> str:
         """Create an ingest run record using Supabase schema."""
-        job_id = f"{job_name}_{int(datetime.now().timestamp())}"
+        job_id = f"{job_name}_{int(datetime.now(timezone.utc).timestamp())}"
 
         async with get_db_session() as session:
             ingest_run = IngestRuns(
                 job_id=job_id,
                 source="apify_rebuild",
-                started_at=datetime.now(),
+                started_at=datetime.utcnow(),
                 status="SUCCESS",
                 meta=metadata
             )
@@ -403,7 +408,7 @@ class DatabaseRebuilder:
             ingest_run = result.scalar_one_or_none()
 
             if ingest_run:
-                ingest_run.finished_at = datetime.now()
+                ingest_run.finished_at = datetime.utcnow()
                 ingest_run.status = "FAILED" if error_message else "SUCCESS"
 
                 # Update metadata
@@ -412,7 +417,7 @@ class DatabaseRebuilder:
                     "records_processed": records_processed,
                     "records_failed": records_failed,
                     "error_message": error_message,
-                    "completed_at": datetime.now().isoformat()
+                    "completed_at": datetime.utcnow()
                 })
                 ingest_run.meta = meta
 
@@ -436,7 +441,7 @@ class DatabaseRebuilder:
                     comp_link = CompetitorLink(
                         asin_main=main_asin,
                         asin_comp=comp_asin,
-                        created_at=datetime.now()
+                        created_at=datetime.utcnow()
                     )
                     await session.merge(comp_link)  # Use merge to handle duplicates
                     links_created += 1
