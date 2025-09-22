@@ -164,7 +164,7 @@ class DatabaseRebuilder:
             # Process each valid product
             processed = 0
             failed = 0
-            features_processed = 0
+            # Features will be processed by the core processor
 
             for product_data in filtered_products:
                 try:
@@ -172,15 +172,11 @@ class DatabaseRebuilder:
                     if not asin:
                         raise ValueError("Product missing ASIN")
 
-                    # Ingest raw event with original data
+                    # Ingest raw event with original data (features will be processed by the processor)
                     await self._ingest_single_product(product_data, job_id)
                     processed += 1
 
-                    # Process features separately
-                    features_count = await self._process_product_features(product_data)
-                    features_processed += features_count
-
-                    logger.debug(f"Processed product {asin} with {features_count} features")
+                    logger.debug(f"Ingested product {asin} into raw events")
 
                 except Exception as e:
                     asin = product_data.get('asin', 'unknown')
@@ -209,7 +205,7 @@ class DatabaseRebuilder:
                 "total_products_in_file": len(products_data),
                 "valid_products_processed": processed,
                 "products_failed": failed,
-                "features_processed": features_processed,
+                "features_processed": "handled_by_processor",
                 "core_processed": core_processed,
                 "core_failed": core_failed,
                 "competitor_links_created": competitor_links_created
@@ -255,30 +251,8 @@ class DatabaseRebuilder:
 
         logger.debug(f"Ingested enhanced raw event for ASIN {asin}")
 
-    async def _process_product_features(self, product_data: Dict[str, Any]) -> int:
-        """Process product features into Supabase product_features table."""
-        features_data = extract_features_for_database(product_data)
-
-        if not features_data or not features_data.get('asin'):
-            return 0
-
-        async with get_db_session() as session:
-            # Create ProductFeatures record using Supabase schema
-            product_features = ProductFeatures(
-                asin=features_data['asin'],
-                bullets=features_data.get('bullets'),
-                attributes=features_data.get('attributes'),
-                extracted_at=datetime.now()
-            )
-
-            # Use merge to handle duplicates
-            await session.merge(product_features)
-            await session.commit()
-
-        # Count features extracted
-        bullets_count = len(features_data.get('bullets', []))
-        attributes_count = len(features_data.get('attributes', {}))
-        return bullets_count + attributes_count
+    # _process_product_features method removed - features are now processed
+    # by the core processor in the correct sequence (after products are created)
 
     async def rebuild_all(self, dry_run: bool = False) -> Dict[str, Any]:
         """Complete rebuild: clear existing data and rebuild with enhanced parsing."""
@@ -303,12 +277,12 @@ class DatabaseRebuilder:
 
         # Summary
         total_valid_products = rebuild_result.get('valid_products_processed', 0)
-        total_features = rebuild_result.get('features_processed', 0)
+        # Features are processed by the core processor automatically
         total_core_processed = rebuild_result.get('core_processed', 0)
 
         results['summary'] = {
             "total_valid_products_processed": total_valid_products,
-            "total_features_processed": total_features,
+            "features_processing": "handled_by_core_processor",
             "total_core_records_processed": total_core_processed,
             "status": "completed"
         }
