@@ -52,6 +52,7 @@ class Settings(BaseSettings):
     
     # Apify Configuration
     apify_api_key: Optional[str] = None
+    apify_use_real_api_default: bool = False  # Default to simulation unless explicitly requested
     
     # Docker Configuration (optional - used by docker-compose)
     postgres_db: Optional[str] = None

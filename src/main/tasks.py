@@ -1,7 +1,7 @@
 """Celery tasks for background processing."""
 
 from datetime import datetime, date, timedelta
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 import logging
 from celery import Celery
 from celery.schedules import crontab
@@ -67,12 +67,14 @@ def run_async_task(async_func, *args, **kwargs):
 
 
 @celery_app.task(bind=True, name="src.main.tasks.run_daily_etl_pipeline")
-def run_daily_etl_pipeline(self, target_date_str: str = None):
+def run_daily_etl_pipeline(self, target_date_str: str = None, use_real_api: Optional[bool] = None):
     """
     Run the complete daily ETL pipeline.
-    
+
     Args:
         target_date_str: ISO date string (YYYY-MM-DD), defaults to today
+        use_real_api: If True, use real Apify API; if False, use simulation;
+                     if None, use environment default
     """
     async def _run_pipeline():
         # Initialize database connection for this worker process
@@ -101,9 +103,12 @@ def run_daily_etl_pipeline(self, target_date_str: str = None):
         # Start the job
         await ingest_service.start_job(job_id)
         
-        # Step 1: Simulate data ingestion
-        logger.info(f"Job {job_id}: Simulating data ingestion")
-        events_ingested = await etl_worker.simulate_apify_ingestion(job_id, target_date, sample_size=10)
+        # Step 1: Data ingestion (real or simulated)
+        data_source = "real Apify API" if use_real_api else "simulated data"
+        logger.info(f"Job {job_id}: Ingesting data from {data_source}")
+        events_ingested = await etl_worker.ingest_apify_data(
+            job_id, target_date, use_real_api=use_real_api, sample_size=10
+        )
         
         # Step 2: Process raw events into core tables
         logger.info(f"Job {job_id}: Processing core metrics")

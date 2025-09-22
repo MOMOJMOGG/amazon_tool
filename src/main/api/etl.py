@@ -19,7 +19,8 @@ router = APIRouter(prefix="/v1/etl", tags=["ETL Pipeline"])
 class TriggerJobRequest(BaseModel):
     """Request to trigger an ETL job."""
     job_name: str = Field(..., description="Job name to execute")
-    target_date: Optional[str] = Field(None, description="Target date (YYYY-MM-DD)")
+    target_date: Optional[str] = Field(None, description="Target date (YYYY-MM-DD), defaults to today")
+    use_real_api: Optional[bool] = Field(None, description="Use real Apify API instead of simulation (null = use env default)")
     job_metadata: Optional[Dict[str, Any]] = Field(None, description="Additional job metadata")
 
 
@@ -39,15 +40,20 @@ async def trigger_etl_job(request: TriggerJobRequest):
             # Trigger daily ETL pipeline
             from src.main.tasks import run_daily_etl_pipeline
             
-            task = run_daily_etl_pipeline.delay(request.target_date)
-            
+            task = run_daily_etl_pipeline.delay(request.target_date, request.use_real_api)
+
+            # Determine data source for display
+            from src.main.config import settings
+            use_real = request.use_real_api if request.use_real_api is not None else settings.apify_use_real_api_default
+            data_source = "real Apify API" if use_real else "simulated data"
             return JobStatusResponse(
                 job_id=task.id,
                 status="scheduled",
-                message=f"Daily ETL pipeline scheduled for {request.target_date or 'today'}",
+                message=f"Daily ETL pipeline scheduled for {request.target_date or 'today'} using {data_source}",
                 details={
                     "celery_task_id": task.id,
-                    "target_date": request.target_date
+                    "target_date": request.target_date,
+                    "use_real_api": request.use_real_api
                 }
             )
             
